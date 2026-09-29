@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from annunciator.config.schema import PROVIDER_DEFAULTS
+from annunciator.config.validate import validate_router_config
 from annunciator.memory.router import make_config
 from annunciator.setup.agents import mcp_command, write_agent_files
 from annunciator.setup.keys import create_key
@@ -211,7 +212,9 @@ def generate(
             raise ValueError(f"Unknown provider {provider['type']!r}; choose jev, anthropic or openai")
         mem = data / "memory"
         router_config = mem / "config.json"
-        write(router_config, json.dumps(make_config(config["machines"], memory_port, provider), indent=2) + "\n")
+        router = make_config(config["machines"], memory_port, provider)
+        validate_router_config(router, source="memory router settings")  # fail before writing
+        write(router_config, json.dumps(router, indent=2) + "\n")
         create_key(mem / "router.key")
         config["memory_router"] = {"url": f"http://127.0.0.1:{memory_port}"}
         config["services"] = [s for s in config["services"] if s["id"] != "memory-router"]

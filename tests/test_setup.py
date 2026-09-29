@@ -85,6 +85,11 @@ class WizardTests(unittest.TestCase):
     def test_bad_answers_write_nothing(self):
         with tempfile.TemporaryDirectory() as folder:
             project = copy_project(Path(folder))
+            result = wizard(project, "--defaults", "--with-memory", "--provider", "openai", "--model", "m",
+                            "--base-url", "localhost:11434")  # fmt: skip
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("provider.base_url", result.stderr)
+            self.assertFalse((project / "runtime/memory/config.json").exists())
             result = wizard(project, "--defaults", "--bind", "not a host!")
             self.assertEqual(result.returncode, 2)
             self.assertIn("bind: must be a hostname", result.stderr)

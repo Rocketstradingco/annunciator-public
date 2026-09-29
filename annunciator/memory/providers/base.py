@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
@@ -77,7 +78,8 @@ class Provider:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 return json.loads(response.read())
         except urllib.error.HTTPError as exc:
-            detail = _error_detail(exc)
+            # An auth failure's text can echo part of the key; say nothing more than the status.
+            detail = "" if exc.code in (401, 403) else _error_detail(exc)
             exc.close()
             raise ProviderError(
                 f"{self.name} returned HTTP {exc.code}{detail}; check the key, credit and model name."
@@ -97,4 +99,6 @@ def _error_detail(exc: urllib.error.HTTPError) -> str:
         return ""
     error = body.get("error") if isinstance(body, dict) else None
     message = error.get("message") if isinstance(error, dict) else error if isinstance(error, str) else None
-    return f" ({str(message)[:160]})" if message else ""
+    if not message:
+        return ""
+    return " (" + re.sub(r"\b(sk|key)-[A-Za-z0-9_*.-]+", "[redacted]", str(message))[:160] + ")"

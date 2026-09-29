@@ -1,7 +1,10 @@
 # Tools
 
 Everything is a subcommand of `python3 -m annunciator` (or `bin/annunciator`),
-except the maintainer scripts in `tools/`. `python3 -m annunciator --help` and
+except the maintainer scripts in `tools/`. Annunciator runs from its checkout;
+if you want an `annunciator` command on your PATH, use an editable install
+(`pip install -e .`), because the server serves `web/` and reads
+`package.json` from the checkout. `python3 -m annunciator --help` and
 `… <command> --help` list every option.
 
 ## Setup wizard

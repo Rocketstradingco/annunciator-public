@@ -165,6 +165,13 @@ class HttpAndMcpTests(unittest.TestCase):
         )  # fmt: skip
         self.assertTrue(unreachable["result"]["isError"])
 
+    def test_mcp_waits_as_long_as_configured(self):
+        with mock.patch("annunciator.memory.mcp.call", return_value={}) as call:
+            respond({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                     "params": {"name": "memory_lock_release", "arguments": {"lease": "x"}}},
+                    self.base, "k", timeout=130)  # fmt: skip
+        self.assertEqual(call.call_args[0][-1], 130)
+
     def test_stdio_loop(self):
         stdin = io.StringIO('{"jsonrpc": "2.0", "id": 1, "method": "ping"}\n\nnot json\n')
         stdout = io.StringIO()

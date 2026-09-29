@@ -375,6 +375,7 @@ check the provider and key.
 | `runtime/jev/` | `runtime/memory/` (the old folder is still used when it is the only one) |
 | router `"model": "typesafe/jev-1.13"` | `"provider": {"type": "jev", "model": "typesafe/jev-1.13"}` (migrated on load) |
 | unknown keys ignored | unknown keys are errors, with a suggestion |
+| `""` for an optional value (`"mac": ""`, `"open": ""`) meant "not set" | still means "not set"; `null` also means "use the default" |
 
 To move your file: `mkdir -p config && mv server/config.local.json config/local.json`,
 then `python3 -m annunciator config validate`.

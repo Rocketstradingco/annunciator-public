@@ -78,7 +78,7 @@ def call(base: str, token: str, path: str, arguments: dict, timeout: float = 40)
         raise RuntimeError("Memory router unreachable; start it and check its URL/key.") from None
 
 
-def respond(message, base: str, token: str):
+def respond(message, base: str, token: str, timeout: float = 40):
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
         return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid JSON-RPC request"}}
     if "id" not in message:
@@ -127,7 +127,7 @@ def respond(message, base: str, token: str):
             ):
                 raise ValueError("Invalid tool arguments")
             try:
-                value = call(base, token, spec[1], arguments)
+                value = call(base, token, spec[1], arguments, timeout)
                 result = {"content": [{"type": "text", "text": json.dumps(value)}], "isError": False}
             except RuntimeError as exc:
                 result = {"content": [{"type": "text", "text": str(exc)}], "isError": True}
@@ -140,14 +140,14 @@ def respond(message, base: str, token: str):
     return response
 
 
-def serve_stdio(base: str, token: str, stdin=None, stdout=None) -> int:
+def serve_stdio(base: str, token: str, stdin=None, stdout=None, timeout: float = 40) -> int:
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
     for line in stdin:
         if not line.strip():
             continue
         try:
-            response = respond(json.loads(line), base, token)
+            response = respond(json.loads(line), base, token, timeout)
         except ValueError:
             response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Invalid JSON"}}
         if response is not None:

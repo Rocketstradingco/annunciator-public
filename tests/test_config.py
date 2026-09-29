@@ -106,6 +106,20 @@ class ValidationTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             validate_config(example(wake_broadcast="192.0.2.255", wake={"broadcast": "192.0.2.254"}))
 
+    def test_hand_edited_v02_blanks_mean_unset(self):
+        config = example(ssh_config="", wake_source="", wake_broadcast="", memory_router={})
+        config["branding"]["accent"] = ""
+        config["machines"][0].update(mac="", containers="", ssh="", telemetry="", platform=None)
+        config["services"][0].update(open="", host="", description=None)
+        c = validate_config(config)
+        self.assertIsNone(c["memory_router"])
+        self.assertEqual(
+            (c["wake"]["broadcast"], c["wake"]["source"], c["ssh"]["config"]), ("255.255.255.255", None, None)
+        )
+        machine = c["machines"][0]
+        self.assertEqual((machine["mac"], machine["telemetry"], machine["platform"]), (None, None, "linux"))
+        self.assertEqual((c["services"][0]["open"], c["services"][0]["description"]), (None, ""))
+
     def test_environment_and_command_line_precedence(self):
         env = {"ANNUNCIATOR_PORT": "19001", "ANNUNCIATOR_LOG_LEVEL": "debug", "ANNUNCIATOR_BIND": "0.0.0.0"}
         c = validate_config(EXAMPLE, env=env)

@@ -184,6 +184,12 @@ def _apply(
     labels = labels or {}
     for f in fields:
         present, value = _get(data, f.key)
+        # v0.2 treated "" as unset, and null means "use the default" for keys that have one.
+        if present and value == "" and f.kind != "str" and not f.required:
+            value = None
+            _set(data, f.key, None)
+        if present and value is None and not f.nullable:
+            present = False
         if not present:
             if f.required:
                 problems.append(f"{prefix}{f.key}: is required")
@@ -274,6 +280,8 @@ def validate_config(
     labels = _env_overrides(config, fields, env, problems)
     _overrides(config, overrides, labels)
 
+    if config.get("memory_router") == {}:  # v0.2 ignored an empty object
+        config["memory_router"] = None
     router = config.get("memory_router")
     plain = [f for f in fields if not f.key.startswith("memory_router.")]
     _apply(config, plain, problems, labels=labels)

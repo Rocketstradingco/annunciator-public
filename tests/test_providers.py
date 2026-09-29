@@ -57,13 +57,23 @@ class JevProviderTests(unittest.TestCase):
         self.assertIn("bucket", request["body"]["questions"])
 
     def test_http_errors_are_explained_without_the_key(self):
-        with FakeAPI((401, {"error": {"message": "invalid key"}})) as api:
+        with FakeAPI((402, {"error": {"message": "insufficient credit"}})) as api:
             config = router_config({"type": "jev", "base_url": api.url})
             provider = make_provider(config["provider"], api_key="sk-or-test-only")
             with self.assertRaises(ProviderError) as caught:
                 provider.decide(config["questions"], "fact")
-        self.assertIn("HTTP 401 (invalid key)", str(caught.exception))
+        self.assertIn("HTTP 402 (insufficient credit)", str(caught.exception))
         self.assertNotIn("sk-or-test-only", str(caught.exception))
+
+    def test_auth_failures_never_echo_key_text(self):
+        body = {"error": {"message": "Incorrect API key provided: sk-proj-abc***wxyz"}}
+        for status in (401, 400):
+            with self.subTest(status=status), FakeAPI((status, body)) as api:
+                config = router_config({"type": "openai", "base_url": api.url, "model": "m"})
+                with self.assertRaises(ProviderError) as caught:
+                    make_provider(config["provider"], api_key="test-only-key").decide(config["questions"], "fact")
+                self.assertNotIn("sk-proj", str(caught.exception))
+                self.assertIn(f"HTTP {status}", str(caught.exception))
 
     def test_missing_key_fails_before_any_request(self):
         with FakeAPI() as api:

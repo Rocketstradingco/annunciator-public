@@ -178,6 +178,7 @@ def cmd_memory(args) -> int:
     # mcp: never log to stdout, which carries the protocol.
     from annunciator.memory.mcp import serve_stdio
 
+    timeout = 40.0
     if args.url:
         base = args.url
         key_file = Path(args.key_file) if args.key_file else None
@@ -186,13 +187,14 @@ def cmd_memory(args) -> int:
         config = load_router_config(path).config
         base = f"http://127.0.0.1:{config['port']}"
         key_file = Path(args.key_file) if args.key_file else Path(config["key_file"])
+        timeout = max(timeout, config["provider"]["timeout_s"] + 10)  # outlast a slow provider
     if key_file is None:
         raise ConfigError("--key-file is required with --url")
     try:
         token = key_file.read_text(encoding="utf-8").strip()
     except OSError:
         raise ConfigError("router access key not found", str(key_file)) from None
-    return serve_stdio(base, token)
+    return serve_stdio(base, token, timeout=timeout)
 
 
 # -------------------------------------------------------------------- parser
