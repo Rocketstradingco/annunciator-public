@@ -48,7 +48,7 @@ ignore = [
 "tools/build_docs.py" = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["annunciator", "support"]
+known-first-party = ["annunciator", "support", "audit_public", "build_docs", "package_public"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

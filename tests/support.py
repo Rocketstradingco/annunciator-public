@@ -10,8 +10,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+for _path in (ROOT, ROOT / "tools"):  # the package, and the maintainer scripts tests import
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 from annunciator.config import read_json, validate_config  # noqa: E402
 from annunciator.config.loader import resolve_paths  # noqa: E402
