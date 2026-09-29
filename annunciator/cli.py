@@ -8,7 +8,7 @@ Commands
   control-key       create or rotate the control key
   provider-key      save the memory router's model-provider API key
   install-services  install the generated systemd user units
-  memory            serve | mcp: the optional memory router and its MCP adapter
+  memory            serve | mcp | agent-files: the optional memory router for AI agents
   version           print the version
 """
 
@@ -163,6 +163,18 @@ def cmd_memory(args) -> int:
         from annunciator.memory.router import serve
 
         return serve(loaded.config)
+    if args.action == "agent-files":
+        from annunciator.setup.agents import AGENTS, mcp_command, parse_agents, write_agent_files
+        from annunciator.setup.generate import write
+
+        path = (Path(args.router_config) if args.router_config else _default_router_config()).resolve()
+        load_router_config(path)  # refuse to register a router that would not start
+        folder = Path(args.output).resolve() if args.output else path.parent.parent / "setup"
+        agents = parse_agents(args.agents) if args.agents else list(AGENTS)
+        command = mcp_command(sys.executable, PROJECT_ROOT, path)
+        for written in write_agent_files(write, folder, agents, command, path.parent / "MEMORY.md"):
+            print(f"Wrote {written}")
+        return 0
     # mcp: never log to stdout, which carries the protocol.
     from annunciator.memory.mcp import serve_stdio
 
@@ -262,6 +274,14 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--router-config", metavar="FILE", help="Router configuration on this computer")
     m.add_argument("--url", help="Router URL when the router runs elsewhere (e.g. through an SSH tunnel)")
     m.add_argument("--key-file", metavar="FILE", help="Router access key file on this computer")
+    m.set_defaults(func=cmd_memory)
+
+    m = msub.add_parser("agent-files", help="Write MCP registration files for AI agents")
+    m.add_argument("--agents", help="Comma-separated: claude, codex, generic (default: all)")
+    m.add_argument(
+        "--router-config", metavar="FILE", help="Router configuration (default: <data_dir>/memory/config.json)"
+    )
+    m.add_argument("--output", metavar="DIR", help="Where to write (default: <data_dir>/setup)")
     m.set_defaults(func=cmd_memory)
 
     p = sub.add_parser("version", help="Print the version")

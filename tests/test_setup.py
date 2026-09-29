@@ -137,6 +137,13 @@ class WizardTests(unittest.TestCase):
             self.assertTrue((setup / "register-claude.sh").exists())
             self.assertFalse((setup / "register-codex.sh").exists())
             self.assertFalse((setup / "mcp.json").exists())
+            result = subprocess.run(
+                [sys.executable, str(project / "bin/annunciator"), "memory", "agent-files", "--agents", "codex",
+                 "--router-config", str(project / "runtime/memory/config.json")],
+                capture_output=True, text=True,
+            )  # fmt: skip
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((setup / "register-codex.sh").exists())
         self.assertEqual(parse_agents("Claude, codex"), ["claude", "codex"])
         self.assertEqual(parse_agents("none"), [])
         with self.assertRaises(ValueError):
