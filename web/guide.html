@@ -25,12 +25,7 @@ blockquote{margin:1em 0;padding:0 1em;border-left:3px solid var(--accent);color:
 <section id="page-getting-started"><h2 id="getting-started">Getting started</h2>
 <p>This page takes you from a fresh copy of the source to a dashboard watching your own computers. Nothing here contacts another computer until you choose to, and nothing is preset: every address, account and key is yours.</p>
 <h3 id="what-you-need">What you need</h3>
-<ul><li>A Linux computer to run the dashboard, with <strong>Python 3.10 or newer</strong>. No</li></ul>
-<p>other packages are needed.</p>
-<ul><li>A browser. Phones and other computers can connect if you let the dashboard</li></ul>
-<p>listen on your network.</p>
-<ul><li>Optional: SSH access to the machines you want CPU, memory and disk readings</li></ul>
-<p>from; Docker or Podman for container inventories; an Android phone for the app; an API key or a local model server for the memory router.</p>
+<ul><li>A Linux computer to run the dashboard, with <strong>Python 3.10 or newer</strong>. No other packages are needed.</li><li>A browser. Phones and other computers can connect if you let the dashboard listen on your network.</li><li>Optional: SSH access to the machines you want CPU, memory and disk readings from; Docker or Podman for container inventories; an Android phone for the app; an API key or a local model server for the memory router.</li></ul>
 <h3 id="1-try-the-demo">1. Try the demo</h3>
 <pre class="lang-sh"><code>git clone https://github.com/&lt;your-org&gt;/annunciator-public.git   # or unzip the source ZIP
 cd annunciator-public
@@ -247,7 +242,7 @@ python3 -m annunciator config schema &gt; my-schema.json     # JSON Schema</code
 <h3 id="updates">Updates</h3>
 <p>You can serve your own builds to your phones:</p>
 <ol><li>Bump <code>version</code> and <code>versionCode</code> in <code>package.json</code> (the Gradle build reads both; <code>versionCode</code> must increase).</li><li>Build and sign the APK (below).</li><li>Copy it to <code>updates/annunciator.apk</code> on the server and write <code>updates/release.json</code>:</li></ol>
-<p><code></code><code>json {&quot;versionCode&quot;: 4, &quot;versionName&quot;: &quot;0.3.1&quot;, &quot;notes&quot;: &quot;What changed&quot;} </code><code></code></p>
+<pre class="lang-json"><code>{&quot;versionCode&quot;: 4, &quot;versionName&quot;: &quot;0.3.1&quot;, &quot;notes&quot;: &quot;What changed&quot;}</code></pre>
 <p>In Settings, <strong>Check for updates</strong> calls <code>GET /api/update</code>. When <code>versionCode</code> is greater than the installed one, the app offers the update; installing downloads <code>GET /api/update/apk</code> into its private cache (plain HTTP(S), no redirects, at most 100 MB) and opens Android's installer, which asks you to confirm. Android only accepts an update signed with the same key as the installed app, so keep your signing key.</p>
 <p><code>updates_dir</code> moves the folder; nothing is offered unless both files exist.</p>
 <h3 id="building">Building</h3>

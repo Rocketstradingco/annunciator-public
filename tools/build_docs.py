@@ -95,12 +95,13 @@ def markdown_to_html(text: str, pages: dict[str, str]) -> str:
         if not line.strip() or line.lstrip().startswith("<!--"):
             i += 1
             continue
-        if line.startswith("```"):
-            lang = line[3:].strip()
+        if line.lstrip().startswith("```"):
+            indent = len(line) - len(line.lstrip())
+            lang = line.strip()[3:].strip()
             block = []
             i += 1
-            while i < len(lines) and not lines[i].startswith("```"):
-                block.append(lines[i])
+            while i < len(lines) and not lines[i].lstrip().startswith("```"):
+                block.append(lines[i][indent:] if lines[i][:indent].isspace() else lines[i])
                 i += 1
             i += 1
             cls = f' class="lang-{html.escape(lang)}"' if lang else ""
@@ -123,7 +124,15 @@ def markdown_to_html(text: str, pages: dict[str, str]) -> str:
         if re.match(r"^\s*([-*]|\d+\.)\s", line):
             ordered = bool(re.match(r"^\s*\d+\.", line))
             items: list[str] = []
-            while i < len(lines) and (re.match(r"^\s*([-*]|\d+\.)\s", lines[i]) or lines[i].startswith("   ")):
+            while i < len(lines) and (
+                re.match(r"^\s*([-*]|\d+\.)\s", lines[i])
+                or (lines[i].startswith("  ") and not lines[i].lstrip().startswith("```"))
+                or (not lines[i].strip() and i + 1 < len(lines) and lines[i + 1].startswith("   ")
+                    and not lines[i + 1].lstrip().startswith("```"))
+            ):  # fmt: skip
+                if not lines[i].strip():
+                    i += 1
+                    continue
                 if re.match(r"^\s*([-*]|\d+\.)\s", lines[i]):
                     items.append(re.sub(r"^\s*([-*]|\d+\.)\s+", "", lines[i]))
                 else:
