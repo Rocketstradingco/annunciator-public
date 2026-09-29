@@ -9,6 +9,8 @@ permissions:
   contents: read
 
 jobs:
+  # The job names "python (3.10)", "python (3.13)" and "web" are required
+  # status checks on main; keep them unchanged.
   python:
     runs-on: ubuntu-latest
     strategy:
@@ -34,8 +36,34 @@ jobs:
             mkdir -p runtime && printf '%s\n' "$AUDIT_MARKERS" > runtime/audit-markers.txt
           fi
           python tools/audit_public.py
-      - name: Localhost starter validates
-        run: python tools/setup.py --check server/config.example.json
+      - name: Example configurations validate
+        run: python -m annunciator config validate config/minimal.example.jsonc config/full.example.jsonc
+      - name: Generated schema, examples and guide are current
+        run: python tools/build_docs.py --check
+      - name: Server starts and answers
+        run: |
+          python -m annunciator serve --port 18161 --data-dir "$RUNNER_TEMP/annunciator" &
+          for _ in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:18161/api/health && break
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:18161/api/state > /dev/null
+          curl -fsS http://127.0.0.1:18161/ > /dev/null
+          kill %1
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install ruff
+        run: python -m pip install ruff==0.15.8
+      - name: Lint
+        run: ruff check --output-format=github .
+      - name: Format
+        run: ruff format --check .
 
   web:
     runs-on: ubuntu-latest
