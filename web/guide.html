@@ -1,238 +1,282 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Annunciator setup</title><style>body{margin:0;background:#161a1d;color:#e7e1d9;font:15px/1.55 system-ui}main{max-width:880px;margin:auto;padding:24px}a{color:#f3a16e}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}h1{color:#f3a16e}</style><main><h1>Annunciator setup</h1><p>Configure only your own addresses and keys.</p><pre># First run: what the wizard does
-
-**You need:** a Linux server with Python 3.10+, a browser on the same computer, and the source ZIP. Optional remote metrics need SSH on the target. Optional Jev needs an OpenRouter account and API key. Android is optional.
-
-1. Unzip the source ZIP (or `git clone` the repository) and open a terminal in that folder. Run `python3 tools/setup.py`. To look first, `python3 server/annunciator.py` starts a localhost-only demo from `server/config.example.json` at http://127.0.0.1:18160/.
-2. Give the dashboard a name. Choose `127.0.0.1` for use on the server only. Choose a reachable LAN address or `0.0.0.0` if phones or other computers should connect; manage firewall access yourself.
-3. Add your computers. A name, address and TCP probe port are enough for online/offline status. Supply `user@host` only if you want SSH metrics, containers or power. Add HTTP services with a URL the *server* can reach. Supply separate open URLs a phone/browser can reach.
-4. Choose whether to enable controls, a dedicated SSH key and Jev. All are optional. Controls get their own key; they cannot run until a target has its required permissions.
-5. The wizard writes `server/config.local.json`, `runtime/setup/setup-report.json`, a foreground starter, and a systemd user unit. These local files contain your own addresses and stay out of sharing archives. It never contacts or changes another host during setup. Use `--force` only when you intend to replace local config.
-6. Run `python3 tools/doctor.py`. It validates config and reports TCP/HTTP reachability, SSH, router and service readiness without sending control actions (`--no-probe` skips the reachability checks). Until the dashboard is running, its own host and service entries report CHECK; run the doctor again after starting it. Start `runtime/setup/start-dashboard.sh` and open the reported URL. If you chose LAN listening, use `http://YOUR_SERVER_IP:PORT` on other devices. In Android Settings enter this URL; the APK contains none.
-
-**If you chose SSH:** the wizard creates `runtime/ssh/id_ed25519`, a public key and `runtime/ssh/config` for only your selected targets. Review the generated target scripts in `runtime/setup/targets/`. Run the matching script as the *intended monitoring account* on each selected computer to install the public key. Linux `--power`, `--docker`, and `--wol CONNECTION` options change only the named permissions when explicitly passed. Windows `-EnableSsh` requires an elevated shell and enables OpenSSH on private networks. Verify with `ssh -F runtime/ssh/config monitor-YOUR-ID` from the dashboard computer. The wizard never sends the scripts to remote machines.
-
-**If you chose Jev:** run `python3 tools/jev_key.py` to enter your *own* OpenRouter API key without displaying it. Run `runtime/setup/start-memory.sh` in a second terminal. Its health URL uses loopback and its access key is in `runtime/jev/router.key`. With the memory router healthy, run `runtime/setup/register-codex.sh` on the same Linux computer where Codex runs; it adds `annunciator-memory` only if that name is unused. `codex mcp list` should show it. Codex can route facts and manage cooperative write leases. It cannot edit memory through the router. Copy `runtime/setup/AGENTS.memory.md` into project instructions if desired. A Jev test is `python3 tools/doctor.py --jev-test`: it sends a harmless sample fact to OpenRouter and may incur a small charge. [Jev details](SETUP.md#12-jev-and-codex).
-
-For automatic startup on a Linux desktop/server, review the generated service files, then run `python3 tools/install_services.py`. This enables only the reviewed units generated for this installation. If you want boot startup without login, run `sudo loginctl enable-linger YOUR_USER` yourself. Foreground start remains the simple route.
-
-`server/config.local.json`, `runtime/`, target addresses, generated keys, Jev decisions and APK signing material must stay private. They are ignored and excluded from `tools/package_public.py`. The source ZIP is the shareable artifact.
-
-
-# User setup guide
-
-## 1. Server and first run
-
-Use Linux with Python 3.10+. The monitoring server needs network routes to the
-computers and services you choose. Run
-`python3 tools/setup.py`, then `python3 server/annunciator.py`, from this app folder.
-Ctrl+C stops it. Setup generates local files and does not contact monitored machines. Review generated target scripts before applying them.
-
-The server loads server/config.local.json when present; otherwise it uses
-server/config.example.json, which probes only localhost. Your local file stays
-ignored and is excluded from sharing archives. An explicitly supplied missing
-ANNUNCIATOR_CONFIG file fails instead of silently choosing another configuration.
-
-After editing, run `python3 tools/setup.py --check server/config.local.json`, then
-restart. Availability history resets on restart. Defaults are 10-second probes,
-90 availability samples, and 15-second telemetry with 60 samples.
-
-## 2. Configuration reference
-
-| Field | Purpose / default |
-| --- | --- |
-| port | Listener port, 18160 |
-| bind | 127.0.0.1 local-only; choose your LAN IP or 0.0.0.0 for LAN access |
-| interval_s | TCP/HTTP probe interval, 10 seconds |
-| history | Availability samples, 90 |
-| branding.name | Header/title/operations label |
-| branding.subtitle | Header subtitle |
-| branding.accent | Six-digit hex color, e.g. #dc6b2f |
-| allow_controls | Enable write routes, false by default |
-| wake_broadcast | WoL destination, 255.255.255.255 |
-| wake_source | Optional local IP to bind WoL traffic |
-| machines | Host definitions |
-| services | HTTP service definitions |
-| speedtest | Optional bandwidth test routes/interval |
-
-IDs use letters, digits, underscores or hyphens; they are unique within hosts or
-services. A service’s host must match a configured machine ID. Validation checks
-format, not network reachability or target permissions.
-
-## 3. Hosts and telemetry
-
-Example host (replace with your own data):
-
-```json
-{
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Annunciator guide</title>
+<!-- Generated by tools/build_docs.py from docs/*.md; edit the Markdown, not this file. -->
+<style>:root{--bg:#f4f2ee;--fg:#1d2226;--muted:#5b6268;--accent:#b4531f;--line:#d7d2ca;--code:#e9e5de}
+@media (prefers-color-scheme:dark){:root{--bg:#161a1d;--fg:#e7e1d9;--muted:#a39d95;--accent:#f3a16e;--line:#2d3439;--code:#20262a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,sans-serif}
+main{max-width:900px;margin:auto;padding:24px 16px 64px}h1,h2,h3,h4,h5{line-height:1.25;margin:1.6em 0 .5em}
+h1{color:var(--accent);margin-top:0}h2{border-top:1px solid var(--line);padding-top:1.2em}a{color:var(--accent)}
+code{background:var(--code);padding:.1em .3em;border-radius:3px;font:13px/1.4 ui-monospace,monospace;overflow-wrap:anywhere}
+pre{background:var(--code);padding:12px;border-radius:6px;overflow-x:auto}pre code{padding:0;background:none}
+.table{overflow-x:auto;margin:1em 0}table{border-collapse:collapse;font-size:14px;min-width:100%}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{background:var(--code)}
+nav{border:1px solid var(--line);border-radius:6px;padding:8px 16px}nav li{margin:2px 0}
+blockquote{margin:1em 0;padding:0 1em;border-left:3px solid var(--accent);color:var(--muted)}</style>
+</head>
+<body>
+<main>
+<h1>Annunciator guide</h1>
+<p>Set up the dashboard with your own addresses and keys. This copy works offline; the full documentation lives in the source folder under <code>docs/</code>.</p>
+<nav><ul><li><a href="#getting-started">Getting started</a></li><li><a href="#monitoring">Monitoring</a></li><li><a href="#configuration-reference">Configuration reference</a></li><li><a href="#android-app">Android app</a></li><li><a href="#troubleshooting">Troubleshooting</a></li></ul></nav>
+<section id="page-getting-started"><h2 id="getting-started">Getting started</h2>
+<p>This page takes you from a fresh copy of the source to a dashboard watching your own computers. Nothing here contacts another computer until you choose to, and nothing is preset: every address, account and key is yours.</p>
+<h3 id="what-you-need">What you need</h3>
+<ul><li>A Linux computer to run the dashboard, with <strong>Python 3.10 or newer</strong>. No other packages are needed.</li><li>A browser. Phones and other computers can connect if you let the dashboard listen on your network.</li><li>Optional: SSH access to the machines you want CPU, memory and disk readings from; Docker or Podman for container inventories; an Android phone for the app; an API key or a local model server for the memory router.</li></ul>
+<h3 id="1-try-the-demo">1. Try the demo</h3>
+<pre class="lang-sh"><code>git clone https://github.com/&lt;your-org&gt;/annunciator-public.git   # or unzip the source ZIP
+cd annunciator-public
+python3 -m annunciator serve</code></pre>
+<p>Open &lt;http://127.0.0.1:18160/&gt;. Until you create <code>config/local.json</code>, the server runs <code>config/minimal.example.jsonc</code>, which watches only this computer and the dashboard itself. Press Ctrl+C to stop it.</p>
+<p><code>bin/annunciator</code> does the same as <code>python3 -m annunciator</code> and works from any folder (<code>/path/to/annunciator-public/bin/annunciator serve</code>).</p>
+<h3 id="2-run-the-setup-wizard">2. Run the setup wizard</h3>
+<pre class="lang-sh"><code>python3 -m annunciator setup</code></pre>
+<p>The wizard asks for:</p>
+<ol><li><strong>A name, subtitle and accent colour</strong> for the header.</li><li><strong>Where to listen.</strong> <code>127.0.0.1</code> keeps the dashboard on this computer. A LAN address or <code>0.0.0.0</code> lets phones and other computers connect; you manage the firewall. Read Security (<code>docs/security.md</code>) before exposing it.</li><li><strong>Your machines.</strong> An ID, a display name, an address and a TCP port to probe are enough for online/offline status. Add an SSH target (<code>user@host</code>) only if you want telemetry, containers or power control. Add a MAC address only for Wake-on-LAN.</li><li><strong>Your HTTP services.</strong> A URL the <em>server</em> can reach for the check, and an optional URL a <em>phone or browser</em> opens.</li><li><strong>Controls</strong> (Wake-on-LAN, power, containers, speed tests). Off by default; turning them on creates a control key.</li><li><strong>The memory router</strong> for AI agents (optional): which model provider and which agents to register. See AI agents and models (<code>docs/ai-agents.md</code>).</li><li><strong>A dedicated SSH key</strong> (only asked when a machine has an SSH target).</li></ol>
+<p>It writes <code>config/local.json</code> and, under <code>runtime/</code> (your <em>data folder</em>):</p>
+<div class="table"><table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody><tr><td><code>runtime/setup/start-dashboard.sh</code></td><td>Start the dashboard in the foreground.</td></tr><tr><td><code>runtime/setup/annunciator-public.service</code></td><td>A systemd user unit for the same command.</td></tr><tr><td><code>runtime/setup/setup-report.json</code></td><td>What was generated and what to do next.</td></tr><tr><td><code>runtime/control.key</code></td><td>The control key, if you enabled controls.</td></tr><tr><td><code>runtime/ssh/…</code>, <code>runtime/setup/targets/…</code></td><td>The dedicated SSH key and one script per machine, if chosen.</td></tr><tr><td><code>runtime/memory/…</code>, <code>runtime/setup/register-*.sh</code>, <code>mcp.json</code></td><td>Memory router files, if chosen.</td></tr></tbody></table></div>
+<p>These files contain your own addresses and keys. Git ignores them and the source packager leaves them out. The wizard never contacts or changes another machine, and it refuses to overwrite an existing <code>config/local.json</code> unless you pass <code>--force</code>.</p>
+<p>No prompts: <code>python3 -m annunciator setup --defaults</code> creates a localhost-only configuration. Add <code>--with-memory</code> for the memory router. All options are in Tools (<code>docs/tools.md</code>).</p>
+<h3 id="3-check-the-installation">3. Check the installation</h3>
+<pre class="lang-sh"><code>python3 -m annunciator doctor</code></pre>
+<p>The doctor validates the configuration and checks TCP/HTTP reachability, SSH settings, keys and the memory router, without sending any control action. Before the dashboard is running, its own entries report <code>CHECK</code>; run the doctor again after starting it. <code>--no-probe</code> skips reachability checks and <code>--connect</code> also tries an SSH login.</p>
+<h3 id="4-start-the-dashboard">4. Start the dashboard</h3>
+<pre class="lang-sh"><code>runtime/setup/start-dashboard.sh</code></pre>
+<p>Open the URL the wizard printed. If you chose LAN listening, other devices use <code>http://&lt;server-address&gt;:18160</code>. In the Android app, enter that URL in Settings; the app contains no address of its own (<a href="#android-app">Android</a>).</p>
+<p>To start at login, review the generated unit and run <code>python3 -m annunciator install-services</code>. For start at boot without logging in, run <code>sudo loginctl enable-linger &lt;your-user&gt;</code> yourself.</p>
+<h3 id="5-if-you-chose-ssh">5. If you chose SSH</h3>
+<p>Review the scripts in <code>runtime/setup/targets/</code>. Run each one <strong>as the intended monitoring account on that machine</strong> to install the public key. Linux scripts only add the key unless you pass <code>--power</code>, <code>--docker</code> or <code>--wol CONNECTION</code>, each of which changes exactly that permission. Windows scripts need an elevated PowerShell; <code>-EnableSsh</code> installs OpenSSH Server and a private-network firewall rule. Then test from the dashboard computer:</p>
+<pre class="lang-sh"><code>ssh -F runtime/ssh/config monitor-&lt;machine-id&gt; echo ok</code></pre>
+<p>Details and manual alternatives: <a href="#monitoring">Monitoring</a>.</p>
+<h3 id="6-if-you-chose-the-memory-router">6. If you chose the memory router</h3>
+<pre class="lang-sh"><code>python3 -m annunciator provider-key        # your own API key, typed hidden (skip for a local model)
+runtime/setup/start-memory.sh              # in a second terminal
+runtime/setup/register-claude.sh           # and/or register-codex.sh, or use mcp.json
+python3 -m annunciator doctor --memory-test   # optional; sends one sample fact, may be billed</code></pre>
+<p>See AI agents and models (<code>docs/ai-agents.md</code>) for what the router does and how to switch providers.</p>
+<h3 id="next">Next</h3>
+<ul><li><a href="#monitoring">Monitoring</a>: hosts, telemetry, services, containers, controls, speed tests.</li><li><a href="#configuration-reference">Configuration reference</a>: every key, default and environment variable.</li><li><a href="#troubleshooting">Troubleshooting</a>.</li></ul></section>
+<section id="page-monitoring"><h2 id="monitoring">Monitoring</h2>
+<p>What each monitoring feature needs, what it checks, and its honest limits. Every key mentioned here is in the <a href="#configuration-reference">configuration reference</a>.</p>
+<h3 id="machines">Machines</h3>
+<pre class="lang-json"><code>{
   &quot;id&quot;: &quot;workstation&quot;,
   &quot;name&quot;: &quot;Workstation&quot;,
   &quot;role&quot;: &quot;Development&quot;,
   &quot;os&quot;: &quot;Linux&quot;,
-  &quot;ip&quot;: &quot;workstation.example&quot;,
+  &quot;ip&quot;: &quot;192.0.2.10&quot;,
   &quot;port&quot;: 22,
   &quot;platform&quot;: &quot;linux&quot;,
-  &quot;ssh&quot;: &quot;monitor@workstation.example&quot;,
-  &quot;telemetry&quot;: &quot;ssh:monitor@workstation.example&quot;,
+  &quot;ssh&quot;: &quot;monitor@192.0.2.10&quot;,
+  &quot;telemetry&quot;: &quot;ssh:monitor@192.0.2.10&quot;,
   &quot;containers&quot;: &quot;docker&quot;
-}
-```
-
-Only id/ip are required. Name and port default to ID/22. A TCP connection proves
-that port accepts connections; it is not an ICMP ping or complete machine health.
-Any TCP port can be used. For telemetry:
-
-| Value | Requirements |
-| --- | --- |
-| Empty/omitted | Availability only |
-| local | Linux metrics on the monitoring server |
-| ssh:user@host | Remote Linux with SSH, /proc, df, ip, awk and sh |
-| winps:user@host | Windows with OpenSSH Server and Windows PowerShell |
-
-Set up your own SSH authentication. Test `ssh user@host` as the account running the
-server, then test BatchMode/passwordless access. Use your own SSH config aliases,
-IdentityFile or agent. The app never installs users/keys or uses an existing key unless you choose that.
-Linux metrics use a script on stdin; Windows uses a read-only PowerShell command.
-No collector daemon is installed. Missing temperature/link speed remains unavailable.
-
-## 4. HTTP services
-
-```json
-{
+}</code></pre>
+<p>Only <code>id</code> and <code>ip</code> are required; <code>name</code> defaults to the ID and <code>port</code> to 22. Every <code>interval_s</code> seconds (default 10) the server opens a TCP connection to <code>ip:port</code>. A connection proves that port accepts connections; it is not an ICMP ping and not proof of full machine health. Any TCP port works.</p>
+<p>The server keeps the last <code>history</code> results (default 90) per machine in memory, with latency, and raises an event when a machine goes offline or comes back. The first reading after a restart only sets the baseline.</p>
+<h3 id="telemetry">Telemetry</h3>
+<div class="table"><table><thead><tr><th><code>telemetry</code></th><th>Requirements</th></tr></thead><tbody><tr><td>unset</td><td>Availability only.</td></tr><tr><td><code>local</code></td><td>Linux metrics from the computer running the dashboard.</td></tr><tr><td><code>ssh:TARGET</code></td><td>Remote Linux with SSH, <code>/proc</code>, <code>df</code>, <code>ip</code>, <code>awk</code> and <code>sh</code>.</td></tr><tr><td><code>winps:TARGET</code></td><td>Windows with OpenSSH Server and Windows PowerShell.</td></tr></tbody></table></div>
+<p>Every <code>telemetry.interval_s</code> seconds (default 15) the server collects CPU, cores, load, memory, root-disk use, the highest thermal-zone temperature, uptime, the default route's interface and link speed, and network counters. Linux gets a short read-only script on stdin (<code>sh -s</code>); Windows gets a read-only PowerShell command. Nothing is installed on the target. Readings that a machine cannot provide (temperature in a VM, link speed of a virtual NIC) stay empty.</p>
+<p>Collections are skipped while a machine is offline. A reading older than three intervals is shown as stale.</p>
+<h4 id="ssh">SSH</h4>
+<p>The server runs <code>ssh</code> as the account that runs the dashboard, with <code>BatchMode=yes</code> (never a password prompt), <code>StrictHostKeyChecking=accept-new</code> and connection multiplexing (<code>ControlPersist</code>, default 180 s). Set it up the way you normally would: your own key, agent or <code>~/.ssh/config</code> aliases, then test <code>ssh -o BatchMode=yes TARGET true</code> as that account.</p>
+<p>Or let the wizard create a dedicated key (<code>runtime/ssh/id_ed25519</code>) and an SSH config (<code>runtime/ssh/config</code>, referenced by <code>ssh.config</code>) containing only your chosen machines, with aliases <code>monitor-&lt;id&gt;</code>. The per-machine scripts in <code>runtime/setup/targets/</code> install the public key; see <a href="#5-if-you-chose-ssh">Getting started</a>.</p>
+<h4 id="resource-alerts">Resource alerts</h4>
+<p>Disk use at or above <code>thresholds.disk_warn</code> (0.80) raises a warning and at <code>thresholds.disk_crit</code> (0.90) a critical event; memory at <code>thresholds.mem_warn</code> (0.90) raises a warning. A recovery below the warning level raises an "ok" event. The web client colours its gauges with the same thresholds.</p>
+<h3 id="http-services">HTTP services</h3>
+<pre class="lang-json"><code>{
   &quot;id&quot;: &quot;photos&quot;,
   &quot;name&quot;: &quot;Photo library&quot;,
   &quot;host&quot;: &quot;workstation&quot;,
   &quot;description&quot;: &quot;Photo service&quot;,
-  &quot;probe&quot;: &quot;http://workstation.example:8080/health&quot;,
-  &quot;open&quot;: &quot;http://workstation.example:8080/&quot;
-}
-```
-
-The server reaches probe; the phone/browser reaches open. Set them independently
-if routes differ. HTTP below 500, including 401/403/404, counts as responding.
-Timeouts, connection errors and 5xx count as down. This is HTTP availability; use
-the service’s own console for internal application health. Embedded URL credentials
-are rejected. Authenticated probes are not implemented.
-
-## 5. Containers
-
-Set containers=docker or podman. Set ssh for a remote target; without ssh, container
-queries execute locally on the monitoring server. The selected account needs its
-own runtime access. The app does not grant permissions. Inventory polls every 30
-seconds while the machine is online. With controls enabled, UI start/restart actions
-need two taps; API also supports stop. Only current inventory names can be controlled.
-
-## 6. Controls and your key
-
-Answer yes during setup, or set allow_controls=true in your local config and run
-`python3 tools/control_key.py`. Setup generates runtime/control.key with restrictive
-permissions. View it locally with `cat runtime/control.key` and enter it in Settings.
-Your key is never bundled into the APK/web assets. The key utility preserves an
-existing key; use --rotate to replace it and update each device afterward.
-
-ANNUNCIATOR_CONTROL_KEY can supply a key through the environment.
-ANNUNCIATOR_CONTROL_KEY_FILE can select your own key file (legacy variable name).
-All POST controls, including WoL and speed-test requests, require this key; disabled
-controls remain blocked even with a valid key.
-
-For WoL add the target’s mac, enable WoL in firmware/OS, and set wake_broadcast for
-your own subnet if required. Set wake_source only to choose the sending interface.
-The server needs a network path for the magic packet and the target needs standby
-power. Routed/VPN networks may require a user-configured relay.
-
-Power requires ssh and platform=linux or windows. Linux runs only
-`sudo -n /usr/bin/systemctl reboot` or poweroff. An administrator can grant a
-restricted rule, after verifying that path on their own target, using sudo visudo:
-
-```text
-monitor ALL=(root) NOPASSWD: /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff
-```
-
-Windows runs shutdown /r /t 0 or shutdown /s /t 0 as your selected SSH user, which
-needs appropriate rights. The app never grants them. The local monitoring-server
-entry cannot be powered off through the app. UI power actions require two taps
-within four seconds. Test power changes only on an explicitly approved test host.
-
-## 7. Optional speed tests
-
-Off by default. Opt in by replacing speedtest with:
-
-```json
-{
+  &quot;probe&quot;: &quot;http://192.0.2.10:8080/health&quot;,
+  &quot;open&quot;: &quot;https://photos.example.com/&quot;
+}</code></pre>
+<p>The <strong>server</strong> requests <code>probe</code>; a <strong>browser or phone</strong> opens <code>open</code>. Set them separately when the routes differ. Any answer below HTTP 500, including 401, 403 and 404, counts as up because the process is serving. Timeouts, connection errors and 5xx count as down. This is availability, not application health. URLs with embedded credentials are rejected, and authenticated probes are not implemented. <code>host</code> links the service to a machine for the topology view.</p>
+<h3 id="containers">Containers</h3>
+<p>Set <code>containers</code> to <code>docker</code> or <code>podman</code>. With <code>ssh</code> set, the inventory runs on that machine; without it, on the dashboard computer. The account needs access to the runtime (for Docker, membership of the <code>docker</code> group; the Linux target script's <code>--docker</code> flag adds it). Every <code>container_poll.interval_s</code> seconds (default 30) the server lists containers on online machines and raises a warning when a running container stops.</p>
+<h3 id="controls">Controls</h3>
+<p>Controls are off until you set <code>&quot;allow_controls&quot;: true</code> and create a key:</p>
+<pre class="lang-sh"><code>python3 -m annunciator control-key          # creates runtime/control.key (keeps an existing one)
+python3 -m annunciator control-key --rotate # replaces it; re-enter it on every device</code></pre>
+<p>Enter the key in each browser's or phone's Settings. It is stored on that device only and never bundled into the web or Android assets. Every control request needs both <code>allow_controls</code> and the key; <code>ANNUNCIATOR_CONTROL_KEY</code> can supply the key through the environment instead of the file. In the web client, destructive actions need a second tap within four seconds.</p>
+<h4 id="wake-on-lan">Wake-on-LAN</h4>
+<p>Add the machine's <code>mac</code>, enable Wake-on-LAN in its firmware and operating system, and set <code>wake.broadcast</code> to your subnet's broadcast address if the default <code>255.255.255.255</code> does not reach it. <code>wake.source</code> binds the sending address to pick an interface. The server needs a network path for the magic packet (UDP port <code>wake.port</code>, default 9) and the target needs standby power; routed or VPN networks may need a relay. The machine shows as waking for <code>wake.window_s</code> seconds (180).</p>
+<h4 id="power">Power</h4>
+<p>Needs <code>ssh</code> and <code>platform</code>. Linux runs exactly <code>sudo -n /usr/bin/systemctl reboot</code> or <code>poweroff</code>; grant a restricted rule on the target (the Linux target script's <code>--power</code> flag does this after <code>visudo -c</code>):</p>
+<pre class="lang-text"><code>monitor ALL=(root) NOPASSWD: /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff</code></pre>
+<p>Windows runs <code>shutdown /r /t 0</code> or <code>shutdown /s /t 0</code> as the SSH user, which needs the right to shut down. The machine that hosts the dashboard (no <code>ssh</code>) cannot be powered off from it. Test power only on a machine you have explicitly chosen for testing.</p>
+<h4 id="container-actions">Container actions</h4>
+<p>With controls on, the API can start, stop or restart a container by name. Only names in the current inventory are accepted. The web client offers start and restart.</p>
+<h3 id="speed-tests">Speed tests</h3>
+<p>Off until you list a route:</p>
+<pre class="lang-json"><code>&quot;speedtest&quot;: {
   &quot;interval_h&quot;: 3,
   &quot;routes&quot;: [{ &quot;id&quot;: &quot;default&quot;, &quot;label&quot;: &quot;Internet connection&quot; }]
-}
-```
-
-Tests transfer data to Cloudflare’s speed-test endpoints. Phases are capped and
-stalls/errors recorded. Results persist in runtime/speedtest.json. Manual requests
-require enabled controls/key. Add iface=&quot;eth0&quot; only when Linux interface binding
-is needed; it may require elevated network privileges. Omit iface for default routing.
-
-## 8. Browser and Android settings
-
-Browsers default to their page’s server. Android has no default personal server:
-enter your URL in Settings. An optional fallback URL is tried when primary fails;
-the last successful route is remembered. Choose System, Light or Dark per device.
-
-Phone alerts use Android WorkManager roughly every 15 minutes, subject to OS
-scheduling, and require notification permission. Enable/disable in Settings.
-First background contact sets a baseline; later host/service failures/recoveries
-and resource warnings produce alerts. Actual scheduling must be tested on a phone.
-
-Read endpoints are visible to devices reaching the listener. Use a trusted LAN/VPN
-or an authenticated HTTPS reverse proxy protecting the whole app. The control key
-alone does not hide monitoring data. The server does not provide user accounts.
-
-## 9. Your updates
-
-Build the public APK and stage it only in this app’s updates/annunciator.apk, beside:
-
-```json
-{
-  &quot;versionCode&quot;: 3,
-  &quot;versionName&quot;: &quot;0.2.1&quot;,
-  &quot;notes&quot;: &quot;Your release notes&quot;
-}
-```
-
-Save that as updates/release.json. Bump package.json before building and keep the
-manifest aligned; phones offer the update only when versionCode is greater than
-the installed one. Keep the same public package and signing key for upgrades.
-Android asks the user to approve installation. Without both staged public files, no update is offered.
-
-## 10. Optional service
-
-Foreground is the default. For autostart, an administrator may create a distinct
-annunciator-public.service with an absolute path to this copy and its own config.
-Use ExecStart=/usr/bin/python3 /YOUR/PUBLIC/FOLDER/server/annunciator.py. Decide
-whether to enable it yourself. The wizard can install its own user units with --install-services after review; it refuses to replace an existing unit.
-
-## Troubleshooting
-
-| Symptom | Check |
-| --- | --- |
-| Other device cannot connect | Listen address, URL, port, firewall and route |
-| Android is disconnected at first run | Enter your own server URL in Settings |
-| Host offline | Configured TCP port, listener, DNS and route from server |
-| SSH metrics fail | Same server account’s BatchMode SSH, key and remote tools |
-| Online host has no gauges | Set telemetry; wait one 15-second collection interval |
-| Container inventory unavailable | Runtime permissions and configured docker/podman |
-| Controls missing or 403 | allow_controls, correct key and relevant ssh/mac/runtime fields |
-| Power sudo error | Target’s restricted systemctl permissions |
-| WoL has no effect | Standby power, firmware, MAC, broadcast and interface |
-| No update | Both public update files, valid manifest and newer versionCode |
-| Port busy | Change port, self-host probe port and self-service URLs together |
-| Validation error | Correct the named field and run --check again |
-
-## 11. Dedicated SSH key and target scripts
-
-Select dedicated SSH in the wizard to generate runtime/ssh/id_ed25519, public key, runtime/ssh/config and per-target scripts in runtime/setup/targets/. Only the targets you entered appear. Run each script as its intended account on your own computer. Linux default adds just the public key; explicit --power, --docker or --wol CONNECTION flags add the named permission. Windows -EnableSsh enables OpenSSH and a private-network firewall rule when run elevated. The wizard never contacts a target. Verify with `ssh -F runtime/ssh/config monitor-YOUR-ID`.
-
-## 12. Jev and Codex
-
-Jev is optional. It is a typed decision model for routing durable facts, not a chatbot or automatic memory writer. The wizard builds routing categories from your chosen hosts, creates runtime/jev/config.json, a separate router.key, a blank MEMORY.md, and a local router service. Basic monitoring does not need Jev. A fact is sent to OpenRouter when you call memory_route. Local logs retain only decisions, confidence and recorded cost, not fact text. Do not submit secrets. Usage is billed to your own OpenRouter account.
-
-Enter your own OpenRouter key with tools/jev_key.py. Start runtime/setup/start-memory.sh, then runtime/setup/register-codex.sh on the same computer. Run tools/doctor.py --jev-test for a live billed provider check. The MCP adapter exposes routing and cooperative leases; it never writes memory automatically.
-
-Codex on a separate computer: the router listens on loopback only, so reach it through a private tunnel you control, for example `ssh -N -L 18170:127.0.0.1:18170 you@your-server` (use your Jev port). Copy runtime/jev/router.key to a private file on the Codex computer, keep a copy of this source there, and register the adapter with `codex mcp add annunciator-memory -- python3 /PATH/TO/annunciator-public/memory/mcp_stdio.py --url http://127.0.0.1:18170 --key-file /PATH/TO/router.key`. Do not expose the router port to your LAN.
-</pre></main></html>
+}</code></pre>
+<p>Each run measures latency, jitter, download and upload against <code>speedtest.host</code> (Cloudflare's public speed endpoints by default). Phases stop at their time or byte cap (8 s / 50 MB down, 6 s / 20 MB up by default), and a stall is recorded as a result, not an error. Results persist in <code>&lt;data_dir&gt;/speedtest.json</code>. Add <code>&quot;iface&quot;: &quot;eth0&quot;</code> to a route to test through a specific Linux interface (this uses <code>SO_BINDTODEVICE</code> and may need extra privileges). Running a test on demand is a control and needs the key.</p>
+<h3 id="events-and-the-log-view">Events and the Log view</h3>
+<p>Offline and recovery transitions, resource warnings, stopped containers, container actions and speed-test failures become events. The server keeps the last <code>events.keep</code> (200) in memory; they reset on restart. <code>/api/events</code> lets the Android app fetch only new ones (API (<code>docs/api.md</code>)).</p>
+<h3 id="what-survives-a-restart">What survives a restart</h3>
+<div class="table"><table><thead><tr><th>Kept</th><th>Reset</th></tr></thead><tbody><tr><td>configuration, keys, speed-test history, memory-router decision log</td><td>availability history, latency, telemetry samples, events</td></tr></tbody></table></div></section>
+<section id="page-configuration-reference"><h2 id="configuration-reference">Configuration reference</h2>
+<p>Annunciator reads two JSON files. Both are validated at start-up against one schema ([<code>annunciator/config/schema.py</code>](../annunciator/config/schema.py)); any problem is reported with the file, the key and what is wrong, all at once, and the program exits with status 2 instead of starting half-configured.</p>
+<div class="table"><table><thead><tr><th>File</th><th>Read by</th><th>Written by</th></tr></thead><tbody><tr><td><code>config/local.json</code></td><td>the dashboard (<code>annunciator serve</code>)</td><td>the setup wizard, then you</td></tr><tr><td><code>&lt;data_dir&gt;/memory/config.json</code></td><td>the memory router (<code>annunciator memory serve</code>)</td><td>the wizard when you choose the memory router</td></tr></tbody></table></div>
+<p>Both accept comments (<code>//</code> and <code>/* */</code>), so you can annotate your own copy. [<code>config/minimal.example.jsonc</code>](../config/minimal.example.jsonc) is the smallest useful file; [<code>config/full.example.jsonc</code>](../config/full.example.jsonc) lists every key with its default. Editors that understand JSON Schema can use [<code>config/schema.json</code>](../config/schema.json) and [<code>config/router.schema.json</code>](../config/router.schema.json) for completion and inline checks (the examples already point at them with <code>&quot;$schema&quot;</code>).</p>
+<h3 id="where-the-dashboard-looks-for-its-configuration">Where the dashboard looks for its configuration</h3>
+<ol><li><code>--config FILE</code> on the command line.</li><li>The <code>ANNUNCIATOR_CONFIG</code> environment variable.</li><li><code>config/local.json</code> in the project folder.</li><li><code>server/config.local.json</code>, the v0.2 location (still read, with a warning).</li><li><code>config/minimal.example.jsonc</code>: a localhost-only demo, so a fresh checkout starts.</li></ol>
+<p>A file named by 1 or 2 that does not exist is an error; the server never falls back to a different file silently.</p>
+<h3 id="precedence">Precedence</h3>
+<p>For each key, the last of these wins:</p>
+<ol><li>the default in the schema;</li><li>the value in the file;</li><li>the environment variable listed in the <strong>Env</strong> column;</li><li>the matching command-line option (<code>serve --port</code>, <code>--bind</code>, <code>--data-dir</code>, <code>--log-level</code>).</li></ol>
+<p>Relative paths in the dashboard configuration are resolved against the project folder (the folder that contains <code>annunciator/</code>), not the current directory. Relative paths in the router configuration are resolved against the folder that holds that file.</p>
+<h3 id="checking-a-configuration">Checking a configuration</h3>
+<pre class="lang-sh"><code>python3 -m annunciator config validate                    # the file serve would use
+python3 -m annunciator config validate config/local.json  # a specific file
+python3 -m annunciator config validate --router runtime/memory/config.json
+python3 -m annunciator serve --check                      # also applies env and CLI overrides
+python3 -m annunciator config show                        # the effective configuration, defaults filled in
+python3 -m annunciator config schema &gt; my-schema.json     # JSON Schema</code></pre>
+<p>A failing check prints every problem, for example:</p>
+<pre class="lang-text"><code>configuration error: config/local.json: 3 problems:
+  - prot: unknown key; did you mean &#x27;port&#x27;?
+  - machines[1] (nas).ip: must be a hostname or IP address (got &#x27;admin@nas&#x27;)
+  - services[0] (photos).host: &#x27;media&#x27; is not a configured machine ID</code></pre>
+<p>Unknown keys are errors (with a suggestion), because a misspelt key would otherwise be silently ignored. <code>$schema</code> is allowed anywhere at the top level.</p>
+<h3 id="environment-variables">Environment variables</h3>
+<div class="table"><table><thead><tr><th>Variable</th><th>Effect</th></tr></thead><tbody><tr><td><code>ANNUNCIATOR_CONFIG</code></td><td>Dashboard configuration file (see the search order above).</td></tr><tr><td><code>ANNUNCIATOR_PORT</code></td><td>Overrides <code>port</code>.</td></tr><tr><td><code>ANNUNCIATOR_BIND</code></td><td>Overrides <code>bind</code>.</td></tr><tr><td><code>ANNUNCIATOR_DATA_DIR</code></td><td>Overrides <code>data_dir</code>.</td></tr><tr><td><code>ANNUNCIATOR_LOG_LEVEL</code></td><td>Overrides <code>log_level</code> (<code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>).</td></tr><tr><td><code>ANNUNCIATOR_WEB</code></td><td>Overrides <code>web_root</code>.</td></tr><tr><td><code>ANNUNCIATOR_UPDATES</code></td><td>Overrides <code>updates_dir</code>.</td></tr><tr><td><code>ANNUNCIATOR_SPEEDTEST</code></td><td>Overrides <code>speedtest.history_file</code>.</td></tr><tr><td><code>ANNUNCIATOR_CONTROL_KEY_FILE</code></td><td>Overrides <code>control_key_file</code>.</td></tr><tr><td><code>ANNUNCIATOR_CONTROL_KEY</code></td><td>The control key itself; wins over the key file. Never put it in a config file.</td></tr><tr><td><code>ANNUNCIATOR_MEMORY_PROVIDER</code></td><td>Router: overrides <code>provider.type</code>.</td></tr><tr><td><code>ANNUNCIATOR_MEMORY_MODEL</code></td><td>Router: overrides <code>provider.model</code>.</td></tr><tr><td><code>ANNUNCIATOR_MEMORY_BASE_URL</code></td><td>Router: overrides <code>provider.base_url</code>.</td></tr><tr><td><code>ANNUNCIATOR_MEMORY_PORT</code></td><td>Router: overrides <code>port</code>.</td></tr><tr><td><code>OPENROUTER_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code></td><td>Default API-key variables for the three provider types (<code>provider.api_key_env</code> can name another).</td></tr></tbody></table></div>
+<p>If you change <code>port</code> through the environment, remember that the starter configuration also probes the dashboard itself on its port (<code>machines[0].port</code> and <code>services[0].probe</code>); update those entries too or they will show as down.</p>
+<h3 id="dashboard-keys">Dashboard keys</h3>
+<p>Types: <em>host or IP</em> is a hostname or address without <code>user@</code>; <em>SSH target</em> may include <code>user@</code> or be an alias from your SSH config; <em>URL</em> is <code>http://</code> or <code>https://</code> without embedded credentials; <em>ID</em> is 1–64 letters, digits, <code>-</code> or <code>_</code>; <em>path</em> is absolute or relative to the project folder.</p>
+<h4 id="server-top-level">Server (top level)</h4>
+<p>Where the dashboard listens and where it keeps its files. Relative paths are resolved against the project folder (the folder that contains <code>annunciator/</code>).</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>port</code></td><td>integer 1–65535</td><td><code>18160</code></td><td><code>ANNUNCIATOR_PORT</code></td><td>TCP port the dashboard listens on.</td></tr><tr><td><code>bind</code></td><td>host or IP</td><td><code>&quot;127.0.0.1&quot;</code></td><td><code>ANNUNCIATOR_BIND</code></td><td>Listen address. <code>127.0.0.1</code> is this computer only; use a LAN address or <code>0.0.0.0</code> to let phones and other computers connect.</td></tr><tr><td><code>log_level</code></td><td><code>DEBUG</code> | <code>INFO</code> | <code>WARNING</code> | <code>ERROR</code></td><td><code>&quot;INFO&quot;</code></td><td><code>ANNUNCIATOR_LOG_LEVEL</code></td><td>Server log verbosity.</td></tr><tr><td><code>data_dir</code></td><td>path</td><td><code>&quot;runtime&quot;</code></td><td><code>ANNUNCIATOR_DATA_DIR</code></td><td>Private state: control key, speed-test history, memory-router files. Keep it out of Git.</td></tr><tr><td><code>web_root</code></td><td>path</td><td><code>&quot;web&quot;</code></td><td><code>ANNUNCIATOR_WEB</code></td><td>Folder the web client is served from.</td></tr><tr><td><code>updates_dir</code></td><td>path</td><td><code>&quot;updates&quot;</code></td><td><code>ANNUNCIATOR_UPDATES</code></td><td>Folder holding a staged Android update (<code>release.json</code> + <code>annunciator.apk</code>).</td></tr><tr><td><code>control_key_file</code></td><td>path</td><td>unset</td><td><code>ANNUNCIATOR_CONTROL_KEY_FILE</code></td><td>File holding the control key. Default: <code>&lt;data_dir&gt;/control.key</code>. <code>ANNUNCIATOR_CONTROL_KEY</code> supplies the key itself and wins over the file.</td></tr><tr><td><code>cors_origin</code></td><td>string</td><td><code>&quot;*&quot;</code></td><td></td><td><code>Access-Control-Allow-Origin</code> sent with every response. <code>*</code> lets the Android app and other origins read the API; set your own origin or <code>&quot;&quot;</code> to omit the header.</td></tr><tr><td><code>interval_s</code></td><td>integer 1–3600</td><td><code>10</code></td><td></td><td>Seconds between TCP/HTTP availability probes.</td></tr><tr><td><code>history</code></td><td>integer 2–8640</td><td><code>90</code></td><td></td><td>Availability samples kept per host and service (memory only; reset on restart).</td></tr><tr><td><code>allow_controls</code></td><td>boolean</td><td><code>false</code></td><td></td><td>Enable the key-protected write endpoints: Wake-on-LAN, power, containers, speed tests.</td></tr></tbody></table></div>
+<h4 id="branding-branding">Branding (<code>branding</code>)</h4>
+<p>Names and colour shown in the header, page title and Overview.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>branding.name</code></td><td>string</td><td><code>&quot;Annunciator&quot;</code></td><td></td><td>Dashboard name.</td></tr><tr><td><code>branding.subtitle</code></td><td>string</td><td><code>&quot;SYSTEM TELEMETRY&quot;</code></td><td></td><td>Header subtitle.</td></tr><tr><td><code>branding.accent</code></td><td>#RRGGBB</td><td>unset</td><td></td><td>Accent colour as <code>#RRGGBB</code>. Unset keeps the built-in orange.</td></tr></tbody></table></div>
+<h4 id="web-client-ui">Web client (<code>ui</code>)</h4>
+<p>Settings the server passes to every browser and phone through <code>/api/state</code>.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>ui.poll_s</code></td><td>integer 1–300</td><td><code>5</code></td><td></td><td>Seconds between the client's <code>/api/state</code> refreshes.</td></tr></tbody></table></div>
+<h4 id="probes-probe">Probes (<code>probe</code>)</h4>
+<p>The TCP connect (machines) and HTTP GET (services) availability checks.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>probe.timeout_s</code></td><td>number 0.1–60</td><td><code>3</code></td><td></td><td>Seconds before a TCP or HTTP probe counts as failed.</td></tr><tr><td><code>probe.workers</code></td><td>integer 1–256</td><td><code>16</code></td><td></td><td>Probes run in parallel per cycle.</td></tr></tbody></table></div>
+<h4 id="telemetry-telemetry">Telemetry (<code>telemetry</code>)</h4>
+<p>CPU, memory, disk, temperature and network readings collected from machines that set <code>telemetry</code>.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>telemetry.interval_s</code></td><td>integer 1–3600</td><td><code>15</code></td><td></td><td>Seconds between collections.</td></tr><tr><td><code>telemetry.history</code></td><td>integer 2–8640</td><td><code>60</code></td><td></td><td>CPU and network samples kept per machine for charts.</td></tr><tr><td><code>telemetry.timeout_s</code></td><td>number 1–600</td><td><code>15</code></td><td></td><td>Seconds a Linux collection (local or SSH) may take.</td></tr><tr><td><code>telemetry.windows_timeout_s</code></td><td>number 1–600</td><td><code>30</code></td><td></td><td>Seconds a Windows PowerShell collection may take.</td></tr></tbody></table></div>
+<h4 id="container-polling-container-poll">Container polling (<code>container_poll</code>)</h4>
+<p>Inventory of Docker or Podman containers on machines that set <code>containers</code>.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>container_poll.interval_s</code></td><td>integer 5–3600</td><td><code>30</code></td><td></td><td>Seconds between inventory polls.</td></tr><tr><td><code>container_poll.timeout_s</code></td><td>number 1–600</td><td><code>20</code></td><td></td><td>Seconds an inventory command may take.</td></tr><tr><td><code>container_poll.action_timeout_s</code></td><td>number 1–600</td><td><code>60</code></td><td></td><td>Seconds a start/stop/restart may take.</td></tr></tbody></table></div>
+<h4 id="resource-thresholds-thresholds">Resource thresholds (<code>thresholds</code>)</h4>
+<p>Fractions (0-1) at which disk and memory raise warnings. The web client uses the same numbers.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>thresholds.disk_warn</code></td><td>number 0–1</td><td><code>0.8</code></td><td></td><td>Disk use that raises a warning.</td></tr><tr><td><code>thresholds.disk_crit</code></td><td>number 0–1</td><td><code>0.9</code></td><td></td><td>Disk use that raises a critical alert.</td></tr><tr><td><code>thresholds.mem_warn</code></td><td>number 0–1</td><td><code>0.9</code></td><td></td><td>Memory use that raises a warning.</td></tr></tbody></table></div>
+<h4 id="wake-on-lan-wake">Wake-on-LAN (<code>wake</code>)</h4>
+<p>Magic packets for machines that set <code>mac</code> (requires <code>allow_controls</code>).</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>wake.broadcast</code></td><td>host or IP</td><td><code>&quot;255.255.255.255&quot;</code></td><td></td><td>Destination address for magic packets; use your subnet's broadcast if needed.</td></tr><tr><td><code>wake.source</code></td><td>host or IP</td><td>unset</td><td></td><td>Local address to send from, to pick the outgoing interface.</td></tr><tr><td><code>wake.port</code></td><td>integer 1–65535</td><td><code>9</code></td><td></td><td>UDP port for magic packets.</td></tr><tr><td><code>wake.window_s</code></td><td>integer 10–3600</td><td><code>180</code></td><td></td><td>Seconds a machine shows as waking after a packet.</td></tr><tr><td><code>wake.cooldown_s</code></td><td>integer 0–600</td><td><code>10</code></td><td></td><td>Seconds before another packet may be sent to the same machine.</td></tr></tbody></table></div>
+<h4 id="ssh-ssh">SSH (<code>ssh</code>)</h4>
+<p>How the server reaches machines for telemetry, containers and power. It uses the running account's own SSH setup unless <code>ssh.config</code> names a dedicated file.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>ssh.config</code></td><td>path</td><td>unset</td><td></td><td>Dedicated <code>ssh_config</code> file (the wizard writes <code>&lt;data_dir&gt;/ssh/config</code>).</td></tr><tr><td><code>ssh.connect_timeout_s</code></td><td>integer 1–120</td><td><code>4</code></td><td></td><td>SSH <code>ConnectTimeout</code>.</td></tr><tr><td><code>ssh.control_persist_s</code></td><td>integer 0–86400</td><td><code>180</code></td><td></td><td>Seconds an idle multiplexed connection stays open (<code>ControlPersist</code>). 0 disables multiplexing.</td></tr><tr><td><code>ssh.control_path</code></td><td>string</td><td><code>&quot;/tmp/annunciator-public-ssh-%C&quot;</code></td><td></td><td><code>ControlPath</code> for multiplexed connections.</td></tr><tr><td><code>ssh.command_timeout_s</code></td><td>number 1–600</td><td><code>20</code></td><td></td><td>Seconds a power command may take.</td></tr></tbody></table></div>
+<h4 id="events-events">Events (<code>events</code>)</h4>
+<p>The in-memory event log behind the Log view and phone alerts.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>events.keep</code></td><td>integer 10–100000</td><td><code>200</code></td><td></td><td>Events kept in memory.</td></tr><tr><td><code>events.recent</code></td><td>integer 1–1000</td><td><code>40</code></td><td></td><td>Events included in each <code>/api/state</code> reply.</td></tr></tbody></table></div>
+<h4 id="speed-tests-speedtest">Speed tests (<code>speedtest</code>)</h4>
+<p>Optional internet speed tests against Cloudflare's public endpoints. Off until <code>routes</code> lists one.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>speedtest.interval_h</code></td><td>number 0.1–8760</td><td><code>3</code></td><td></td><td>Hours between scheduled runs.</td></tr><tr><td><code>speedtest.first_delay_s</code></td><td>number 0–86400</td><td><code>120</code></td><td></td><td>Minimum seconds after start-up before the first scheduled run.</td></tr><tr><td><code>speedtest.host</code></td><td>host or IP</td><td><code>&quot;speed.cloudflare.com&quot;</code></td><td></td><td>Host serving <code>/__down</code> and <code>/__up</code>.</td></tr><tr><td><code>speedtest.download_limit_s</code></td><td>number 1–120</td><td><code>8</code></td><td></td><td>Download phase time cap.</td></tr><tr><td><code>speedtest.download_limit_bytes</code></td><td>integer 100000–1e+10</td><td><code>50000000</code></td><td></td><td>Download phase byte cap.</td></tr><tr><td><code>speedtest.upload_limit_s</code></td><td>number 1–120</td><td><code>6</code></td><td></td><td>Upload phase time cap.</td></tr><tr><td><code>speedtest.upload_limit_bytes</code></td><td>integer 100000–1e+10</td><td><code>20000000</code></td><td></td><td>Upload phase byte cap.</td></tr><tr><td><code>speedtest.keep</code></td><td>integer 1–10000</td><td><code>48</code></td><td></td><td>Results kept per route.</td></tr><tr><td><code>speedtest.history_file</code></td><td>path</td><td>unset</td><td><code>ANNUNCIATOR_SPEEDTEST</code></td><td>Where results persist. Default: <code>&lt;data_dir&gt;/speedtest.json</code>.</td></tr></tbody></table></div>
+<h4 id="speed-test-route-speedtest-routes">Speed-test route (<code>speedtest.routes[]</code>)</h4>
+<p>One entry of <code>speedtest.routes</code>.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>ID</td><td><strong>required</strong></td><td></td><td>Unique route ID.</td></tr><tr><td><code>label</code></td><td>string</td><td>unset</td><td></td><td>Display name. Default: the ID.</td></tr><tr><td><code>iface</code></td><td>interface</td><td>unset</td><td></td><td>Linux interface to bind (for example <code>eth0</code>); may need extra privileges.</td></tr></tbody></table></div>
+<h4 id="memory-router-link-memory-router">Memory router link (<code>memory_router</code>)</h4>
+<p>Optional. When present, the dashboard shows the local memory router's usage. The router itself is configured in its own file (see below).</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>memory_router.url</code></td><td>URL</td><td><strong>required</strong></td><td></td><td>Router URL; must be on this computer (<code>127.0.0.1</code> or <code>localhost</code>).</td></tr><tr><td><code>memory_router.key_file</code></td><td>path</td><td>unset</td><td></td><td>Router access key. Default: <code>&lt;data_dir&gt;/memory/router.key</code>.</td></tr><tr><td><code>memory_router.timeout_s</code></td><td>number 0.1–30</td><td><code>1.5</code></td><td></td><td>Seconds to wait for the router when building <code>/api/state</code>.</td></tr></tbody></table></div>
+<h4 id="machine-machines">Machine (<code>machines[]</code>)</h4>
+<p>One entry of <code>machines</code>: a computer checked with a TCP connect.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>ID</td><td><strong>required</strong></td><td></td><td>Unique machine ID (letters, digits, <code>_</code>, <code>-</code>).</td></tr><tr><td><code>name</code></td><td>string</td><td>unset</td><td></td><td>Display name. Default: the ID.</td></tr><tr><td><code>ip</code></td><td>host or IP</td><td><strong>required</strong></td><td></td><td>Hostname or IP address the server connects to.</td></tr><tr><td><code>port</code></td><td>integer 1–65535</td><td><code>22</code></td><td></td><td>TCP port to probe.</td></tr><tr><td><code>role</code></td><td>string</td><td><code>&quot;&quot;</code></td><td></td><td>Free-text role shown in details.</td></tr><tr><td><code>os</code></td><td>string</td><td><code>&quot;&quot;</code></td><td></td><td>Operating-system label shown in details.</td></tr><tr><td><code>platform</code></td><td><code>linux</code> | <code>windows</code></td><td><code>&quot;linux&quot;</code></td><td></td><td>Decides the power command.</td></tr><tr><td><code>ssh</code></td><td>SSH target</td><td>unset</td><td></td><td>SSH target (<code>user@host</code> or an alias) for containers and power. Unset means local.</td></tr><tr><td><code>telemetry</code></td><td>telemetry source</td><td>unset</td><td></td><td><code>local</code>, <code>ssh:TARGET</code> (Linux) or <code>winps:TARGET</code> (Windows). Unset: availability only.</td></tr><tr><td><code>containers</code></td><td><code>docker</code> | <code>podman</code></td><td>unset</td><td></td><td>Container runtime to inventory.</td></tr><tr><td><code>mac</code></td><td>MAC</td><td>unset</td><td></td><td>MAC address for Wake-on-LAN.</td></tr><tr><td><code>setup_user</code></td><td>string</td><td>unset</td><td></td><td>Written by the wizard: the account its target script is for. Not used at runtime.</td></tr></tbody></table></div>
+<h4 id="service-services">Service (<code>services[]</code>)</h4>
+<p>One entry of <code>services</code>: an HTTP endpoint checked with a GET.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>ID</td><td><strong>required</strong></td><td></td><td>Unique service ID.</td></tr><tr><td><code>name</code></td><td>string</td><td>unset</td><td></td><td>Display name. Default: the ID.</td></tr><tr><td><code>probe</code></td><td>URL</td><td><strong>required</strong></td><td></td><td>URL the server requests. Any answer below HTTP 500 counts as up.</td></tr><tr><td><code>open</code></td><td>URL</td><td>unset</td><td></td><td>URL a browser or phone opens.</td></tr><tr><td><code>host</code></td><td>string</td><td>unset</td><td></td><td>ID of the machine this service runs on.</td></tr><tr><td><code>description</code></td><td>string</td><td><code>&quot;&quot;</code></td><td></td><td>Free-text description.</td></tr></tbody></table></div>
+<h3 id="memory-router-keys">Memory router keys</h3>
+<p>The router's file lives at <code>&lt;data_dir&gt;/memory/config.json</code>. The wizard writes it with your machines as routing buckets. Change <code>provider</code> to switch models; leave <code>questions</code> alone unless you are adapting the routing itself (the router requires <code>bucket</code>, <code>store</code>, <code>durable</code>, <code>sensitive</code> and <code>importance</code>).</p>
+<h4 id="router-top-level">Router (top level)</h4>
+<p><code>&lt;data_dir&gt;/memory/config.json</code>, written by the wizard. Relative paths are resolved against the folder that holds this file.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>bind</code></td><td>host or IP</td><td><code>&quot;127.0.0.1&quot;</code></td><td></td><td>Listen address. Keep it on loopback.</td></tr><tr><td><code>port</code></td><td>integer 1–65535</td><td><code>18170</code></td><td><code>ANNUNCIATOR_MEMORY_PORT</code></td><td>Listen port.</td></tr><tr><td><code>default_target</code></td><td>string</td><td><code>&quot;MEMORY.md&quot;</code></td><td></td><td>Lease target when an agent names none.</td></tr><tr><td><code>data_dir</code></td><td>path</td><td><code>&quot;data&quot;</code></td><td></td><td>Decision log folder (no fact text is stored).</td></tr><tr><td><code>key_file</code></td><td>path</td><td><code>&quot;router.key&quot;</code></td><td></td><td>Router access key agents present.</td></tr><tr><td><code>log_level</code></td><td><code>DEBUG</code> | <code>INFO</code> | <code>WARNING</code> | <code>ERROR</code></td><td><code>&quot;INFO&quot;</code></td><td></td><td>Router log verbosity.</td></tr><tr><td><code>questions</code></td><td>object</td><td><strong>required</strong></td><td></td><td>Routing questions sent with each fact; generated from your machines.</td></tr></tbody></table></div>
+<h4 id="model-provider-provider">Model provider (<code>provider</code>)</h4>
+<p>Which model answers the routing questions. Keys come from <code>api_key_env</code> or <code>api_key_file</code>, never from this file.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Env</th><th>Description</th></tr></thead><tbody><tr><td><code>provider.type</code></td><td><code>jev</code> | <code>anthropic</code> | <code>openai</code></td><td><code>&quot;jev&quot;</code></td><td><code>ANNUNCIATOR_MEMORY_PROVIDER</code></td><td><code>jev</code> (OpenRouter typed decisions), <code>anthropic</code> (Claude via the Messages API) or <code>openai</code> (any OpenAI-compatible endpoint).</td></tr><tr><td><code>provider.model</code></td><td>string</td><td>unset</td><td><code>ANNUNCIATOR_MEMORY_MODEL</code></td><td>Model name. Default: <code>typesafe/jev-1.13</code> (jev), <code>claude-opus-5-5</code> (anthropic); required for <code>openai</code>.</td></tr><tr><td><code>provider.base_url</code></td><td>URL</td><td>unset</td><td><code>ANNUNCIATOR_MEMORY_BASE_URL</code></td><td>API base URL. Defaults per type; set it for OpenRouter, Ollama, LM Studio or a proxy.</td></tr><tr><td><code>provider.api_key_env</code></td><td>string</td><td>unset</td><td></td><td>Environment variable holding the API key. Default: <code>OPENROUTER_API_KEY</code>, <code>ANTHROPIC_API_KEY</code> or <code>OPENAI_API_KEY</code>.</td></tr><tr><td><code>provider.api_key_file</code></td><td>path</td><td>unset</td><td></td><td>File holding the API key. Default: <code>openrouter.key</code>, <code>anthropic.key</code> or <code>openai.key</code> beside this config.</td></tr><tr><td><code>provider.timeout_s</code></td><td>number 1–600</td><td><code>30</code></td><td></td><td>Seconds to wait for the provider.</td></tr><tr><td><code>provider.max_tokens</code></td><td>integer 64–128000</td><td><code>4096</code></td><td></td><td>Output token cap for chat providers (includes any thinking).</td></tr><tr><td><code>provider.effort</code></td><td><code>low</code> | <code>medium</code> | <code>high</code> | <code>xhigh</code> | <code>max</code></td><td>unset</td><td></td><td>Anthropic <code>output_config.effort</code>. Unset uses the model default; <code>low</code> suits this task on models that support effort.</td></tr><tr><td><code>provider.json_mode</code></td><td>boolean</td><td><code>false</code></td><td></td><td>OpenAI-compatible only: send <code>response_format: {&quot;type&quot;: &quot;json_object&quot;}</code>. Enable for servers that support it.</td></tr></tbody></table></div>
+<h4 id="provider-examples">Provider examples</h4>
+<p>Claude through the Anthropic API (key in <code>ANTHROPIC_API_KEY</code> or <code>anthropic.key</code>):</p>
+<pre class="lang-json"><code>&quot;provider&quot;: { &quot;type&quot;: &quot;anthropic&quot;, &quot;model&quot;: &quot;claude-opus-5-5&quot;, &quot;effort&quot;: &quot;low&quot; }</code></pre>
+<p>OpenRouter's typed decisions with Jev (the default; key in <code>OPENROUTER_API_KEY</code> or <code>openrouter.key</code>):</p>
+<pre class="lang-json"><code>&quot;provider&quot;: { &quot;type&quot;: &quot;jev&quot; }</code></pre>
+<p>Any chat model on OpenRouter through its OpenAI-compatible API:</p>
+<pre class="lang-json"><code>&quot;provider&quot;: {
+  &quot;type&quot;: &quot;openai&quot;,
+  &quot;base_url&quot;: &quot;https://openrouter.ai/api/v1&quot;,
+  &quot;model&quot;: &quot;&lt;vendor&gt;/&lt;model&gt;&quot;,
+  &quot;api_key_env&quot;: &quot;OPENROUTER_API_KEY&quot;,
+  &quot;api_key_file&quot;: &quot;openrouter.key&quot;
+}</code></pre>
+<p>OpenAI:</p>
+<pre class="lang-json"><code>&quot;provider&quot;: { &quot;type&quot;: &quot;openai&quot;, &quot;model&quot;: &quot;&lt;model name&gt;&quot; }</code></pre>
+<p>A local server (no key needed on loopback), for example Ollama or LM Studio:</p>
+<pre class="lang-json"><code>&quot;provider&quot;: { &quot;type&quot;: &quot;openai&quot;, &quot;base_url&quot;: &quot;http://127.0.0.1:11434/v1&quot;, &quot;model&quot;: &quot;llama3.2&quot;, &quot;json_mode&quot;: true }</code></pre>
+<pre class="lang-json"><code>&quot;provider&quot;: { &quot;type&quot;: &quot;openai&quot;, &quot;base_url&quot;: &quot;http://127.0.0.1:1234/v1&quot;, &quot;model&quot;: &quot;&lt;loaded model&gt;&quot; }</code></pre>
+<p>Restart the router after editing, then run <code>python3 -m annunciator doctor</code> to check the provider and key.</p>
+<h3 id="migrating-from-v0-2">Migrating from v0.2</h3>
+<div class="table"><table><thead><tr><th>v0.2</th><th>v0.3</th></tr></thead><tbody><tr><td><code>server/config.local.json</code></td><td><code>config/local.json</code> (the old path is still read, with a warning)</td></tr><tr><td><code>server/config.example.json</code></td><td><code>config/minimal.example.jsonc</code> and <code>config/full.example.jsonc</code></td></tr><tr><td>top-level <code>wake_broadcast</code>, <code>wake_source</code></td><td><code>wake.broadcast</code>, <code>wake.source</code> (old keys still accepted, with a warning)</td></tr><tr><td>top-level <code>ssh_config</code></td><td><code>ssh.config</code> (old key still accepted, with a warning)</td></tr><tr><td><code>runtime/jev/</code></td><td><code>runtime/memory/</code> (the old folder is still used when it is the only one)</td></tr><tr><td>router <code>&quot;model&quot;: &quot;typesafe/jev-1.13&quot;</code></td><td><code>&quot;provider&quot;: {&quot;type&quot;: &quot;jev&quot;, &quot;model&quot;: &quot;typesafe/jev-1.13&quot;}</code> (migrated on load)</td></tr><tr><td>unknown keys ignored</td><td>unknown keys are errors, with a suggestion</td></tr><tr><td><code>&quot;&quot;</code> for an optional value (<code>&quot;mac&quot;: &quot;&quot;</code>, <code>&quot;open&quot;: &quot;&quot;</code>) meant "not set"</td><td>still means "not set"; <code>null</code> also means "use the default"</td></tr></tbody></table></div>
+<p>To move your file: <code>mkdir -p config &amp;&amp; mv server/config.local.json config/local.json</code>, then <code>python3 -m annunciator config validate</code>.</p></section>
+<section id="page-android-app"><h2 id="android-app">Android app</h2>
+<p>The app (<code>io.annunciator.dashboard</code>) is a Capacitor wrapper around the same <code>web/</code> client a browser loads, plus three native pieces: background alerts, an update installer and Back-button handling. It ships with <strong>no server address and no key</strong>; each person enters their own.</p>
+<h3 id="finding-the-server">Finding the server</h3>
+<p>A browser uses the server that served the page. The app has no such origin, so it reads addresses from <strong>Settings</strong>:</p>
+<div class="table"><table><thead><tr><th>Setting</th><th>Meaning</th></tr></thead><tbody><tr><td>Server address</td><td>Your dashboard, e.g. <code>http://192.0.2.20:18160</code> on your LAN.</td></tr><tr><td>Fallback address</td><td>Optional second route to the same server, e.g. through a VPN or reverse proxy (<code>https://dashboard.example.com</code>).</td></tr></tbody></table></div>
+<p>Each refresh tries the address that last worked first, then the other; the one that answers is remembered on the device. If neither answers, the app keeps showing the last reading with a banner saying how old it is.</p>
+<p>For your own build you can pre-fill both in <code>web/config.js</code> (<code>window.ANNUNCIATOR_CONFIG = { server: &#x27;&#x27;, remoteServer: &#x27;&#x27; }</code>). Leave them blank in anything you share, and never put a key there: the file is bundled into the APK. The audit fails if <code>server</code> is not blank.</p>
+<p>The app allows cleartext HTTP (<code>androidScheme: http</code>, <code>cleartext: true</code>) because most home servers have no certificate. Use HTTPS through a reverse proxy when the route leaves your own network (Security (<code>docs/security.md</code>)).</p>
+<h3 id="controls">Controls</h3>
+<p>Enter the control key in Settings; it is kept in the app's local storage on that phone only. Destructive actions need a second tap within four seconds.</p>
+<h3 id="notifications">Notifications</h3>
+<p>When alerts are enabled in Settings, the app hands its server addresses to <code>AlertsWorker</code>, an Android WorkManager job that runs about every 15 minutes (Android's minimum; the OS may delay it further) while a network is available:</p>
+<ol><li>It asks each address in turn for <code>GET /api/events?since=&lt;last seen id&gt;</code>.</li><li>The first successful contact only records the newest event ID, so old events do not arrive as a burst.</li><li>After that, each new <code>crit</code> or <code>warn</code> event, and each <code>ok</code> recovery of a machine or service, becomes a notification in the "System alerts" channel. Tapping one opens the app.</li></ol>
+<p>Android 13 and newer ask for notification permission when you enable alerts. Turning alerts off cancels the job. An alert can trail the event by the worker's interval; real-time paging is not a goal.</p>
+<h3 id="updates">Updates</h3>
+<p>You can serve your own builds to your phones:</p>
+<ol><li>Bump <code>version</code> and <code>versionCode</code> in <code>package.json</code> (the Gradle build reads both; <code>versionCode</code> must increase).</li><li>Build and sign the APK (below).</li><li>Copy it to <code>updates/annunciator.apk</code> on the server and write <code>updates/release.json</code>:</li></ol>
+<pre class="lang-json"><code>{&quot;versionCode&quot;: 4, &quot;versionName&quot;: &quot;0.3.1&quot;, &quot;notes&quot;: &quot;What changed&quot;}</code></pre>
+<p>In Settings, <strong>Check for updates</strong> calls <code>GET /api/update</code>. When <code>versionCode</code> is greater than the installed one, the app offers the update; installing downloads <code>GET /api/update/apk</code> into its private cache (plain HTTP(S), no redirects, at most 100 MB) and opens Android's installer, which asks you to confirm. Android only accepts an update signed with the same key as the installed app, so keep your signing key.</p>
+<p><code>updates_dir</code> moves the folder; nothing is offered unless both files exist.</p>
+<h3 id="building">Building</h3>
+<p>Requirements: Node.js 22+, JDK 21 and the Android SDK (platform 36 and the build tools the Gradle files name). Point Gradle at the SDK with <code>ANDROID_HOME</code>/<code>ANDROID_SDK_ROOT</code> or an ignored <code>android/local.properties</code>.</p>
+<pre class="lang-sh"><code>npm ci
+npm run sync                              # copies web/ into the Android project
+cd android &amp;&amp; ./gradlew assembleDebug     # app/build/outputs/apk/debug/app-debug.apk</code></pre>
+<p><code>make apk</code> does the same. A debug APK is for testing. To distribute, create your own signing key outside this folder, add a release signing configuration through Gradle properties or environment variables (never commit the key), and run <code>./gradlew assembleRelease</code>.</p>
+<p>The minimum Android version is 7.0 (API 24); the target is API 36.</p>
+<h3 id="using-your-own-identity">Using your own identity</h3>
+<p>The package ID <code>io.annunciator.dashboard</code> is this project's. If you publish a fork, change it together in <code>capacitor.config.json</code> (<code>appId</code>), the Gradle <code>namespace</code>/<code>applicationId</code>, the Java package folders and declarations, and the identity checks in <code>tools/audit_public.py</code>. See Customization (<code>docs/customization.md</code>).</p>
+<h3 id="testing-on-a-device">Testing on a device</h3>
+<p>Emulators and <code>tools/ui_preview.py</code> cover layout. Notifications, the installer, Back behaviour, insets and battery-saver scheduling need a real phone; test them there before relying on them.</p></section>
+<section id="page-troubleshooting"><h2 id="troubleshooting">Troubleshooting</h2>
+<p>Start with the doctor; it names most problems directly:</p>
+<pre class="lang-sh"><code>python3 -m annunciator doctor            # add --connect to try SSH logins
+python3 -m annunciator serve --check     # validates exactly what serve would load
+python3 -m annunciator serve --log-level DEBUG</code></pre>
+<h3 id="starting-the-server">Starting the server</h3>
+<div class="table"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td><code>configuration error: …</code> and exit status 2</td><td>The message names the file and every bad key. Fix them and run <code>python3 -m annunciator config validate</code>.</td></tr><tr><td><code>unknown key; did you mean …?</code></td><td>A misspelt key. v0.3 rejects unknown keys instead of ignoring them.</td></tr><tr><td><code>configuration file not found (named by ANNUNCIATOR_CONFIG)</code></td><td>The variable points at a missing file; unset it or fix the path.</td></tr><tr><td><code>no config/local.json yet; running the localhost demo configuration</code></td><td>Normal before setup. Run <code>python3 -m annunciator setup</code>.</td></tr><tr><td><code>reading the v0.2 location server/config.local.json</code></td><td>Move it: <code>mkdir -p config &amp;&amp; mv server/config.local.json config/local.json</code>.</td></tr><tr><td><code>cannot listen on …: Address already in use</code></td><td>Another process has the port. Pick another <code>port</code> (and update the self-monitoring entries that probe it).</td></tr><tr><td><code>cannot listen on …: Cannot assign requested address</code></td><td><code>bind</code> is not an address of this computer.</td></tr><tr><td><code>ModuleNotFoundError: No module named &#x27;annunciator&#x27;</code></td><td>Run from the project folder, or use <code>bin/annunciator</code>, which works from anywhere.</td></tr></tbody></table></div>
+<h3 id="reaching-the-dashboard">Reaching the dashboard</h3>
+<div class="table"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td>Other devices cannot connect</td><td><code>bind</code> is <code>127.0.0.1</code> by default. Use a LAN address or <code>0.0.0.0</code>, open the port in the firewall, and use <code>http://&lt;server-address&gt;:&lt;port&gt;</code>.</td></tr><tr><td>Android shows "Connecting to your server" forever</td><td>Enter your server URL in Settings; the app has no default. Check the phone is on a network that can reach it.</td></tr><tr><td>Android works at home but not away</td><td>Add a fallback address reachable from outside (VPN or reverse proxy).</td></tr><tr><td>The page loads but shows an old reading</td><td>The client lost the server; the banner says since when. Check the server is running.</td></tr></tbody></table></div>
+<h3 id="machines-and-services">Machines and services</h3>
+<div class="table"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td>A machine shows offline but is on</td><td>The TCP probe connects to <code>ip:port</code> (default 22). Is that port open and reachable <em>from the dashboard computer</em>? <code>nc -vz &lt;ip&gt; &lt;port&gt;</code> there.</td></tr><tr><td>The dashboard's own entries show down</td><td>They probe <code>port</code> from the configuration. After changing the port, update <code>machines[0].port</code> and <code>services[0].probe</code>.</td></tr><tr><td>A service shows down with an HTTP code</td><td>Only 5xx counts as down; 4xx is up. A timeout means the server could not reach <code>probe</code>.</td></tr><tr><td>The service link opens the wrong place</td><td><code>open</code> is what the browser opens; <code>probe</code> is what the server checks. Set both.</td></tr></tbody></table></div>
+<h3 id="telemetry-containers-and-ssh">Telemetry, containers and SSH</h3>
+<div class="table"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td>Online machine has no gauges</td><td>Set <code>telemetry</code> and wait one <code>telemetry.interval_s</code> (15 s).</td></tr><tr><td><code>telemetry from X failed: …</code> in the log</td><td>Run the same login as the dashboard's account: <code>ssh -o BatchMode=yes &lt;target&gt; true</code> (add <code>-F runtime/ssh/config</code> if the wizard made a key). It must not ask for anything.</td></tr><tr><td><code>ssh.config: SSH config not found</code></td><td>The file named in <code>ssh.config</code> was moved or deleted; re-run setup or fix the path.</td></tr><tr><td>Temperature or link speed missing</td><td>The machine does not expose them (common in VMs).</td></tr><tr><td>Container inventory unavailable: permission denied</td><td>The SSH account needs access to the Docker/Podman socket (for Docker, the <code>docker</code> group; reconnect afterwards).</td></tr></tbody></table></div>
+<h3 id="controls">Controls</h3>
+<div class="table"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td>No control buttons</td><td><code>allow_controls</code> is false, or the machine lacks <code>mac</code> (wake) or <code>ssh</code> (power).</td></tr><tr><td><code>Control key required</code> (403)</td><td>Enter the key from <code>runtime/control.key</code> in this device's Settings. After <code>--rotate</code>, re-enter it everywhere.</td></tr><tr><td><code>Controls are disabled in the server configuration</code></td><td>Set <code>&quot;allow_controls&quot;: true</code> and restart.</td></tr><tr><td>Power: <code>no passwordless sudo rule</code></td><td>Add the restricted sudoers rule on the target (<a href="#power">Monitoring</a>).</td></tr><tr><td>Wake-on-LAN does nothing</td><td>Firmware and OS settings, standby power, the MAC, <code>wake.broadcast</code> for your subnet, and a network path for UDP broadcast. Routed/VPN networks need a relay.</td></tr></tbody></table></div>
+<h3 id="updates-and-alerts-on-android">Updates and alerts on Android</h3>
+<div class="table"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td>No update offered</td><td>Both <code>updates/release.json</code> and <code>updates/annunciator.apk</code> must exist, and <code>versionCode</code> must be greater than the installed one.</td></tr><tr><td>Android refuses to install the update</td><td>It was signed with a different key than the installed app.</td></tr><tr><td>No notifications</td><td>Alerts enabled in Settings, notification permission granted, battery optimisation not blocking background work. The first check only records a baseline; alerts can trail events by 15 minutes or more.</td></tr></tbody></table></div>
+<h3 id="memory-router">Memory router</h3>
+<div class="table"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td>Overview card: <code>key missing</code></td><td><code>memory_router.key_file</code> (default <code>runtime/memory/router.key</code>) does not exist; re-run setup with <code>--with-memory</code>.</td></tr><tr><td>Overview card: <code>unavailable</code></td><td>The router is not running: <code>runtime/setup/start-memory.sh</code>.</td></tr><tr><td><code>… API key is missing</code></td><td><code>python3 -m annunciator provider-key</code>, or export the variable named in <code>provider.api_key_env</code> for the router's process.</td></tr><tr><td><code>… returned HTTP 401/403</code></td><td>Wrong or revoked key.</td></tr><tr><td><code>… returned HTTP 404</code></td><td>Wrong <code>base_url</code> (for OpenAI-compatible servers it ends in <code>/v1</code>) or a model name the server does not have.</td></tr><tr><td><code>The model returned an invalid decision</code></td><td>The model's answer did not match the questions. Try another model, enable <code>json_mode</code> for OpenAI-compatible servers that support it, or raise <code>max_tokens</code> if the reply was cut off.</td></tr><tr><td>The agent does not list the tools</td><td>Re-run the registration script, restart the agent, and check <code>claude mcp list</code> / <code>codex mcp list</code>. Run the command from <code>runtime/setup/mcp.json</code> by hand: it should wait for input without errors.</td></tr><tr><td><code>Memory router unreachable</code> inside the agent</td><td>Start the router; for a remote agent, check the SSH tunnel.</td></tr></tbody></table></div>
+<h3 id="still-stuck">Still stuck</h3>
+<p>Open an issue with the output of <code>python3 -m annunciator doctor --json</code> and the log lines around the problem, after removing your own addresses and names.</p></section>
+</main>
+</body>
+</html>

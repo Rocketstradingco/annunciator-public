@@ -1,42 +1,53 @@
 # Annunciator
 
-A self-hosted dashboard for computers and HTTP services. It includes local and remote telemetry, availability history, incidents, topology, container monitoring, optional keyed controls, an Android client, and an optional Jev memory router for Codex. It starts with one localhost monitor and no remote addresses or accounts.
+A self-hosted dashboard for the computers and HTTP services you own. It shows
+what is up, how busy it is and what changed, in a browser or an Android app,
+and can wake, reboot and manage containers when you allow it. An optional
+memory router helps AI coding agents (Claude Code, Codex or any MCP client)
+decide what to remember about your setup.
 
-## Try it
+- **Availability** of machines (TCP) and services (HTTP), with history, latency and incidents.
+- **Telemetry** over SSH for Linux and Windows (CPU, memory, disk, temperature, network), with nothing installed on the targets.
+- **Containers** (Docker/Podman), **Wake-on-LAN**, **power** and **speed tests**, behind a key and off by default.
+- **Android app** with background alerts and self-hosted updates.
+- **Runs anywhere Python 3.10+ does**: standard library only, no accounts, no telemetry, nothing preset.
 
-On Linux with Python 3.10+ and no other packages:
+## Quick start
 
 ```sh
-git clone REPOSITORY_URL annunciator-public   # or unzip the source ZIP
+git clone https://github.com/<your-org>/annunciator-public.git
 cd annunciator-public
-python3 server/annunciator.py
+python3 -m annunciator serve          # demo: this computer only, at http://127.0.0.1:18160/
+python3 -m annunciator setup          # add your own machines, services and options
+python3 -m annunciator doctor         # check everything without changing anything
+runtime/setup/start-dashboard.sh      # run your configuration
 ```
 
-Open http://127.0.0.1:18160/. Without `server/config.local.json` the server uses `server/config.example.json`, which monitors only this computer and itself. Ctrl+C stops it. Continue with the wizard below to add your own machines.
+The wizard writes `config/local.json` and scripts under `runtime/`; both stay
+out of Git. It never contacts your other machines. Read
+[Getting started](docs/getting-started.md) for each step.
 
-## Give this to a friend
+> Read endpoints show your monitoring data to anyone who can reach the
+> listener. The default listens on `127.0.0.1` only; before opening it to a
+> network, read the [security model](docs/security.md).
 
-1. Unzip the source (or clone it) on a Linux computer with Python 3.10+.
-2. Run `python3 tools/setup.py` from the source folder. Answer prompts for that person's own hosts, services, access and optional Jev. The wizard generates configuration and installation scripts; it does not silently change other computers.
-3. Run `python3 tools/doctor.py` and follow its specific next steps.
-4. Start the generated scripts: `runtime/setup/start-dashboard.sh` and, if selected, `runtime/setup/start-memory.sh`. Open the dashboard URL shown by the wizard. Android asks for that URL in Settings.
+## Documentation
 
-For a no-prompt localhost starter: `python3 tools/setup.py --defaults`. To include a Jev setup: `python3 tools/setup.py --defaults --with-jev`. The wizard refuses to overwrite an existing configuration unless `--force` is given. Read [First run](docs/FIRST-RUN.md) for what to do with each generated file and [Setup reference](docs/SETUP.md) for every feature.
+- [Getting started](docs/getting-started.md) · [Monitoring](docs/monitoring.md) · [Configuration](docs/configuration.md) · [Tools](docs/tools.md)
+- [Android app](docs/android.md) · [AI agents and models](docs/ai-agents.md) · [Security](docs/security.md) · [Troubleshooting](docs/troubleshooting.md)
+- [Architecture](docs/architecture.md) · [Modules](docs/modules.md) · [HTTP API](docs/api.md) · [All docs](docs/README.md)
 
-Jev uses the friend's own OpenRouter account and key. It is optional and has no effect on basic monitoring. Its typed decisions and write leases can be exposed to Codex on the same computer through the generated registration script. Codex still writes memory itself after evaluating a suggestion.
-
-[AI onboarding](AI-ONBOARDING.md) tells Codex exactly how to assist. [Customization](docs/CUSTOMIZATION.md), [features](docs/FEATURES.md), and [architecture](docs/ARCHITECTURE.md) provide detail.
-
-## Verify and build
+## Development
 
 ```sh
-python3 -m unittest discover -s tests -v   # or: python3 -m pytest
-python3 tools/audit_public.py
-python3 tools/package_public.py            # source-only ZIP under dist/
+make check      # tests, ruff, distribution audit, generated-file check
+make run        # start the dashboard
+make preview    # the UI with synthetic data
 ```
 
-GitHub Actions runs the tests, the audit and the web checks on every pull request (`.github/workflows/ci.yml`). The audit flags private LAN and tailnet addresses, personal email addresses, home-directory paths and key material. To also block words specific to your own installation (old host or account names), list them one per line in `runtime/audit-markers.txt`; that file is ignored by Git and never packaged.
+See [CONTRIBUTING.md](CONTRIBUTING.md). AI agents working in this repository
+follow [AGENTS.md](AGENTS.md).
 
-The dashboard is Python standard library only. Android builds require Node.js 22+, JDK 21 and Android SDK tools listed by the Gradle project. Run `npm ci`, `npm run sync`, then `cd android && ./gradlew assembleDebug`. The separate app ID is `io.annunciator.dashboard`. The source is MIT licensed; bundled fonts retain their OFL notices. A debug APK is for testing; a distributed release needs its own signing key and version bump. Android installation and hardware controls require testing on the recipient's devices.
+## Licence
 
-The server has no user accounts. Read endpoints disclose monitoring data to anyone who can reach the listener. Use a trusted LAN/VPN or authenticated HTTPS reverse proxy. Controls are disabled by default and require a generated key when enabled.
+MIT ([LICENSE](LICENSE)). Bundled fonts keep their SIL Open Font License notices.

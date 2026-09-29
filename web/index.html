@@ -138,8 +138,8 @@
     <section class="view" id="setup" data-view="setup" hidden>
       <div class="panel"><div class="panel__head"><h2 class="panel__title">Make it yours</h2></div>
       <div class="pad"><p>This dashboard monitors your configured machines and services.</p>
-      <ol><li>Run <code>python3 tools/setup.py</code> in this app folder to choose your name, color, hosts, services, and optional controls.</li>
-      <li>Start or restart <code>python3 server/annunciator.py</code> after editing your configuration.</li>
+      <ol><li>Run <code>python3 -m annunciator setup</code> in the source folder to choose your name, color, hosts, services, and optional controls.</li>
+      <li>Check it with <code>python3 -m annunciator doctor</code>, then start or restart <code>python3 -m annunciator serve</code> after editing <code>config/local.json</code>.</li>
       <li>On another device, enter your own server URL in Settings. Android starts with no server configured.</li>
       <li>Controls need your own control key in Settings and must be enabled on your server.</li></ol>
       <p>Read the <a href="guide.html" target="_blank" rel="noopener">complete setup guide</a> for telemetry, permissions, branding, Android, alerts, updates and troubleshooting.</p>

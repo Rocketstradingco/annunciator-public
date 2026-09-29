@@ -1,14 +1,14 @@
 {
   "name": "annunciator-public",
-  "version": "0.2.0",
-  "versionCode": 2,
+  "version": "0.3.0",
+  "versionCode": 3,
   "private": true,
   "description": "Customizable host and service dashboard, public edition",
   "scripts": {
-    "serve": "python3 server/annunciator.py",
+    "serve": "python3 -m annunciator serve",
+    "setup": "python3 -m annunciator setup",
     "sync": "cap sync android",
-    "apk": "cap sync android && cd android && ./gradlew assembleDebug",
-    "setup": "python3 tools/setup.py"
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

@@ -4,7 +4,7 @@
 const NATIVE = Boolean(window.Capacitor?.isNativePlatform?.());
 const NATIVE_DEFAULT = window.ANNUNCIATOR_CONFIG?.server || '';
 const NATIVE_REMOTE = window.ANNUNCIATOR_CONFIG?.remoteServer || '';
-const POLL_MS = 5000;
+const POLL_MS = 5000; // until the server's ui.poll_s arrives in /api/state
 const FETCH_TIMEOUT_MS = 3000;
 const STALE_AFTER_MS = 30000;
 const KEY_SERVER = 'annunciator-public.server';
@@ -286,7 +286,7 @@ function nodeCard(m, i) {
 function telemetryPanel(m, state) {
   const t = m.telemetry;
   if (!t) {
-    return `<section class="panel">${panelHead('Telemetry', m.up ? 'waiting for first sample' : 'host offline')}<p class="muted pad">${m.up ? 'The server collects CPU, memory, disk and temperature every 15 seconds; the first sample is on its way.' : 'No telemetry while the host is offline.'}</p></section>`;
+    return `<section class="panel">${panelHead('Telemetry', m.up ? 'waiting for first sample' : 'host offline')}<p class="muted pad">${m.up ? `The server collects CPU, memory, disk and temperature every ${state.telemetry_interval || 15} seconds; the first sample is on its way.` : 'No telemetry while the host is offline.'}</p></section>`;
   }
   const mem = ratio(t.mem_used, t.mem_total);
   const disk = ratio(t.disk_used, t.disk_total);
@@ -575,8 +575,8 @@ function renderSummary(state, now) {
         ${panelHead('Host telemetry', `${state.machines.filter((m) => m.telemetry && !m.telemetry.stale && m.up).length}/${state.machines.length} reporting`, '01')}
         <div class="node-grid">${state.machines.map((m, i) => nodeCard(m, i)).join('')}</div>
       </section>
-      ${state.memory ? `<section class="panel memory-panel" aria-label="Memory routing">${panelHead('Jev memory router', esc(state.memory.status || 'unavailable'), '03')}
-        <p class="pad">${state.memory.status === 'ready' ? `${state.memory.usage.calls} decisions · $${Number(state.memory.usage.cost || 0).toFixed(4)} in recorded Jev calls` : 'Start your memory router and check its local key.'}</p>
+      ${state.memory ? `<section class="panel memory-panel" aria-label="Memory routing">${panelHead('Memory router', esc(state.memory.status || 'unavailable'), '03')}
+        <p class="pad">${state.memory.status === 'ready' ? `${state.memory.usage.calls} decisions${state.memory.usage.model ? ` · ${esc(state.memory.usage.provider || '')} ${esc(state.memory.usage.model)}` : ''}${Number(state.memory.usage.cost) > 0 ? ` · $${Number(state.memory.usage.cost).toFixed(4)} recorded cost` : ''}` : 'Start your memory router and check its local key.'}</p>
         ${(state.memory.decisions || []).slice(0, 5).map(d => `<p class="pad memory-row">${esc(d.at || '')} · ${esc(d.suggestion?.bucket || '')} · ${esc(d.suggestion?.store || '')}${d.suggestion?.needs_review ? ' · review' : ''}</p>`).join('')}
       </section>` : ''}
       ${networkPanel(state)}
@@ -999,7 +999,7 @@ async function load() {
 function schedule() {
   clearTimeout(app.timer);
   if (document.hidden) return;
-  app.timer = setTimeout(async () => { await load(); schedule(); }, POLL_MS);
+  app.timer = setTimeout(async () => { await load(); schedule(); }, (app.state?.poll_s || POLL_MS / 1000) * 1000);
 }
 
 async function refreshNow() {
