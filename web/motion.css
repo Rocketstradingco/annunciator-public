@@ -1,0 +1,269 @@
+/* Annunciator motion layer over the instrument skin (instruments.css).
+   Loops take their delay from --phase, the seconds into a 600 s cycle that
+   render() writes on every pass, so rebuilding the markup every sample never
+   restarts them; every loop period divides 600. Entrance motion runs only
+   while body.is-entering is set. Nothing here runs under reduced motion. */
+
+@property --reveal { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+
+:root { --scan: color-mix(in srgb, var(--accent-fill) 35%, #fff); }
+
+/* ----------------------------------------------------------------- splash */
+
+html.is-booting, html.is-booting body { overflow: hidden; }
+.splash {
+  position: fixed; z-index: 100; inset: 0; overflow: hidden;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: max(22px, var(--safe-top)) clamp(18px, 4vw, 56px) max(22px, var(--safe-bottom));
+  background: var(--bg); color: var(--ink);
+}
+.splash__grid {
+  position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 32px 32px; background-position: center;
+  -webkit-mask: radial-gradient(ellipse at 50% 50%, #000 0 22%, transparent 72%);
+  mask: radial-gradient(ellipse at 50% 50%, #000 0 22%, transparent 72%);
+}
+.splash__top, .splash__meta {
+  position: relative; display: flex; justify-content: space-between; gap: 16px;
+  color: var(--ink-3); font: 10px var(--mono); letter-spacing: .1em;
+}
+.splash__top span:first-child { color: var(--ink); }
+.splash__top span:first-child::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 9px; background: var(--accent-fill); vertical-align: 1px; }
+
+.splash__stage {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  gap: clamp(28px, 6vw, 96px); min-height: 0;
+}
+
+/* The dial is painted in by the same clockwise sweep that then keeps scanning. */
+.splash__dial {
+  position: relative; flex: none; width: min(56vh, 42vw, 440px); aspect-ratio: 1;
+  -webkit-mask: conic-gradient(#000 var(--reveal), #0000 0);
+  mask: conic-gradient(#000 var(--reveal), #0000 0);
+  animation: sp-reveal 1.3s linear forwards;
+}
+@keyframes sp-reveal { to { --reveal: 360deg; } }
+.splash__sweep {
+  position: absolute; inset: 4.5%; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 250deg, color-mix(in srgb, var(--accent-fill) 26%, transparent) 359.4deg, transparent 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 13%, #000 13.5%);
+  mask: radial-gradient(circle, transparent 0 13%, #000 13.5%);
+  animation: sp-spin 1.3s linear infinite;
+  transition: opacity .5s;
+}
+.splash__sweep::after { content: ""; position: absolute; left: 50%; top: 0; width: 1.5px; height: 50%; transform: translateX(-50%); background: linear-gradient(var(--accent-fill), transparent 85%); }
+.splash.is-ready .splash__sweep, .splash.is-failed .splash__sweep { opacity: 0; }
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+
+.splash__svg { width: 100%; height: 100%; overflow: visible; fill: none; }
+.sp-bezel { stroke: var(--line-2); stroke-width: 1; }
+.sp-ticks { stroke: var(--line-hi); stroke-width: 9; stroke-dasharray: 1.2 8.12; }
+.sp-ticks--major { stroke: var(--ink); stroke-width: 17; stroke-dasharray: 2.4 89.75; }
+.sp-orbit { stroke: var(--line-2); stroke-dasharray: 2 7; transform-origin: 200px 200px; animation: sp-spin 40s linear infinite; }
+.sp-inner { stroke: var(--line); }
+.sp-inner--dash { stroke: var(--line-2); stroke-dasharray: 1 5; transform-origin: 200px 200px; animation: sp-spin 24s linear infinite reverse; }
+
+.sp-link { stroke: var(--line-hi); stroke-width: 1; stroke-dasharray: 1; stroke-dashoffset: 1; animation: sp-draw .5s cubic-bezier(.3, .7, .2, 1) forwards; animation-delay: calc(.35s + var(--k) * .07s); transition: stroke .3s; }
+.sp-link.is-up { stroke: var(--accent-fill); stroke-width: 1.5; }
+.sp-link.is-waking { stroke: var(--warn); stroke-width: 1.5; }
+.sp-link.is-down { stroke: var(--crit); stroke-width: 1.5; stroke-dasharray: .03 .02; stroke-dashoffset: 0; }
+@keyframes sp-draw { to { stroke-dashoffset: 0; } }
+
+.sp-node__body { transform-box: fill-box; transform-origin: center; opacity: 0; animation: sp-pop .4s cubic-bezier(.2, .9, .3, 1.3) forwards; animation-delay: calc(.6s + var(--k) * .07s); }
+@keyframes sp-pop { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: none; } }
+.sp-node__box { fill: var(--bg); stroke: var(--line-hi); stroke-width: 1.2; transition: fill .25s, stroke .25s; }
+.sp-node.is-up .sp-node__box { fill: var(--accent-fill); stroke: var(--accent-fill); }
+.sp-node.is-waking .sp-node__box { fill: var(--warn); stroke: var(--warn); }
+.sp-node.is-down .sp-node__box { fill: var(--crit); stroke: var(--crit); }
+.sp-node__lock { stroke: var(--accent-fill); stroke-width: 1.2; opacity: 0; }
+.sp-node.is-down .sp-node__lock { stroke: var(--crit); }
+.sp-node.is-waking .sp-node__lock { stroke: var(--warn); }
+.sp-node.is-locked .sp-node__lock { animation: sp-lock .45s cubic-bezier(.2, .8, .2, 1) forwards; }
+@keyframes sp-lock { from { r: 40px; opacity: 0; } 55% { opacity: 1; } to { r: 14px; opacity: .85; } }
+.sp-node__label { fill: var(--ink-3); stroke: var(--bg); stroke-width: 4px; paint-order: stroke; stroke-linejoin: round; font: 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; opacity: 0; animation: sp-fade .3s forwards; animation-delay: calc(.75s + var(--k) * .07s); }
+.sp-node.is-locked .sp-node__label { fill: var(--ink); }
+.sp-node.is-down .sp-node__label { fill: var(--crit); }
+@keyframes sp-fade { to { opacity: 1; } }
+
+.sp-core { fill: var(--accent-fill); }
+.sp-cross { stroke: var(--bg); stroke-width: 2; }
+.sp-core-ping { stroke: var(--accent-fill); stroke-width: 1.5; animation: sp-ping 1.3s ease-out infinite; }
+@keyframes sp-ping { from { r: 22px; opacity: .9; } to { r: 84px; opacity: 0; } }
+.splash.is-failed .sp-core { fill: var(--crit); }
+.splash.is-failed .sp-core-ping { stroke: var(--crit); }
+
+.splash__copy { position: relative; display: grid; gap: 22px; width: min(420px, 100%); }
+.splash__copy > * { opacity: 0; animation: sp-rise .6s cubic-bezier(.2, .7, .2, 1) forwards; }
+.splash__kicker { color: var(--accent); font: 10px var(--mono); letter-spacing: .14em; animation-delay: .15s !important; }
+.splash__title { margin: 0; color: var(--ink); font: 600 clamp(52px, 7.4vw, 104px)/.86 var(--display); letter-spacing: -.05em; animation-delay: .25s !important; }
+.splash__title span { color: var(--accent-fill); animation: sp-caret 1s steps(1) infinite; }
+@keyframes sp-caret { 50% { opacity: 0; } }
+@keyframes sp-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.splash__log { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-2); animation-delay: .4s !important; }
+.splash__log li {
+  display: grid; grid-template-columns: 26px 96px minmax(0, 1fr); align-items: center; gap: 8px;
+  min-height: 30px; border-bottom: 1px solid var(--line); font: 10.5px var(--mono); letter-spacing: .04em;
+  animation: sp-type .32s steps(22) both;
+}
+.splash__log li span { color: var(--ink-3); }
+.splash__log li b { color: var(--ink-2); font-weight: 400; }
+.splash__log li em { justify-self: end; color: var(--ink); font-style: normal; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.splash__log li em.is-ok { color: var(--ok); }
+.splash__log li em.is-warn { color: var(--warn); }
+.splash__log li em.is-crit { color: var(--crit); }
+.splash__log li em.is-pending::after { content: "_"; margin-left: 2px; color: var(--accent-fill); animation: sp-caret .7s steps(1) infinite; }
+@keyframes sp-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+.splash__foot { position: relative; display: grid; gap: 10px; }
+.splash__scale {
+  position: relative; height: 12px;
+  background:
+    repeating-linear-gradient(90deg, var(--line-hi) 0 1px, transparent 1px 80px) bottom / 100% 12px no-repeat,
+    repeating-linear-gradient(90deg, var(--line-2) 0 1px, transparent 1px 8px) bottom / 100% 6px no-repeat;
+}
+.splash__scale::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--line-2); }
+.splash__scale i {
+  position: absolute; z-index: 1; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent-fill);
+  transition: width .35s cubic-bezier(.2, .7, .2, 1);
+  animation: sp-crawl 2.4s cubic-bezier(.1, .6, .2, 1) forwards;
+}
+.splash__scale i::after { content: ""; position: absolute; right: -1px; bottom: 0; width: 2px; height: 12px; background: var(--accent-fill); }
+.splash.is-linked .splash__scale i { animation: none; }
+.splash.is-failed .splash__scale i, .splash.is-failed .splash__scale i::after { background: var(--crit); }
+@keyframes sp-crawl { to { width: 28%; } }
+.splash__meta span:first-child { color: var(--ink); }
+.splash.is-failed .splash__meta span:first-child { color: var(--crit); }
+
+.splash.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .5s ease .08s, visibility 0s .6s; }
+.splash.is-leaving .splash__dial { transform: scale(1.14); opacity: 0; transition: transform .6s cubic-bezier(.2, .7, .2, 1), opacity .45s; }
+.splash.is-leaving .splash__copy { transform: translateY(-14px); transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+
+@media (max-width: 759px) {
+  .splash__stage { flex-direction: column; justify-content: center; gap: 26px; }
+  .splash__dial { width: min(80vw, 44vh, 360px); }
+  .splash__copy { gap: 14px; }
+  .splash__title { font-size: clamp(44px, 13vw, 60px); }
+  .splash__title br { display: none; }
+  .splash__log li { grid-template-columns: 22px 84px minmax(0, 1fr); min-height: 26px; font-size: 9.5px; }
+  .splash__top, .splash__meta { font-size: 8.5px; letter-spacing: .06em; }
+}
+@media (max-height: 560px) and (max-width: 759px) { .splash__log { display: none; } }
+
+/* ------------------------------------------------------------ probe cycle */
+
+/* Hairline under the top bar: time until the aggregator's next probe. */
+.cycle { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none; transform-origin: left; transform: scaleX(0); background: var(--accent-fill); }
+.cycle.is-running { animation: m-cycle var(--cycle, 10s) linear var(--cycle-delay, 0s) forwards; }
+.cycle.is-failing { animation: none; transform: none; background: var(--crit); opacity: .5; }
+@keyframes m-cycle { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ------------------------------------------------------------ live motion */
+
+.map-packet { fill: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Alarm lamps. */
+  .dot.is-down { animation: m-pulse 1.6s ease-in-out infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+  .dot.is-waking { animation: m-pulse 2s ease-in-out infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+  @keyframes m-pulse { 50% { opacity: .22; } }
+
+  .brand__mark .brand__ping { fill: none; stroke: var(--accent-fill); stroke-width: 1.2; animation: m-brand 4s ease-out infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+  @keyframes m-brand { 0% { r: 3px; opacity: .9; } 55%, 100% { r: 16px; opacity: 0; } }
+  body.has-fault .brand__mark .brand__ping { stroke: var(--warn); }
+
+  .deck-heading h1 > span { animation: m-caret 1.2s steps(1) infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+  @keyframes m-caret { 50% { opacity: 0; } }
+
+  /* A light travels the status panel's orange rail. */
+  .status { position: relative; }
+  .status::before {
+    display: block; content: ""; position: absolute; z-index: 2; left: 0; right: 0; top: -3px; width: auto; height: 3px; border: 0;
+    background: linear-gradient(90deg, transparent 0 42%, var(--scan) 50%, transparent 58% 100%) no-repeat;
+    background-size: 260% 100%;
+    animation: m-rail 6s cubic-bezier(.45, 0, .55, 1) infinite; animation-delay: calc(var(--phase, 0) * -1s);
+  }
+  @keyframes m-rail { from { background-position: 100% 0; } 70%, to { background-position: 0 0; } }
+
+  /* Radar sweep between the ring's tick scale and its signal tracks. */
+  .ring::before {
+    content: ""; position: absolute; inset: 7%; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(from 0deg, transparent 0 290deg, color-mix(in srgb, var(--accent-fill) 20%, transparent) 359.5deg, transparent 360deg);
+    -webkit-mask: radial-gradient(circle, transparent 0 60%, #000 61%);
+    mask: radial-gradient(circle, transparent 0 60%, #000 61%);
+    animation: sp-spin 8s linear infinite; animation-delay: calc(var(--phase, 0) * -1s);
+  }
+  .ring__arc.is-down { animation: m-pulse 1.6s ease-in-out infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+
+  /* Live read-head at the newest sample of each sparkline. */
+  .chart__head { position: absolute; z-index: 1; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--accent-fill); pointer-events: none; }
+  .chart__head.is-rx { background: var(--rx); }
+  .chart__head::after { content: ""; position: absolute; inset: -5px; border: 1px solid var(--accent-fill); border-radius: 50%; opacity: 0; animation: m-ping 2s ease-out infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+  @keyframes m-ping { from { transform: scale(.4); opacity: .9; } 70%, to { transform: scale(1.8); opacity: 0; } }
+  .node.is-down .chart__head { display: none; }
+
+  /* Packets travel each responding host → service link. */
+  .map-packet { fill: var(--accent-fill); stroke: none; offset-rotate: 0deg; animation: m-travel 3s cubic-bezier(.45, 0, .55, 1) infinite; animation-delay: calc((var(--phase, 0) + var(--k, 0) * .43) * -1s); }
+  @keyframes m-travel { from { offset-distance: 0%; opacity: 0; } 12%, 88% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+  .map-item.is-down { animation: m-alarm 1.6s steps(1) infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+  @keyframes m-alarm { 50% { border-color: var(--line); } }
+
+  /* A down host card carries a blinking red rail. */
+  .node { position: relative; }
+  .node.is-down::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--crit); animation: m-pulse 1.6s ease-in-out infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+
+  /* Hazard stripes march across an open-incident header. */
+  .incidents.is-crit .panel__head, .incidents.is-warn .panel__head {
+    background-image: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--hazard) 13%, transparent) 0 8px, transparent 8px 16px);
+    background-size: 22.63px 22.63px;
+    animation: m-hazard 1.5s linear infinite; animation-delay: calc(var(--phase, 0) * -1s);
+  }
+  .incidents.is-crit { --hazard: var(--crit); }
+  .incidents.is-warn { --hazard: var(--warn); }
+  @keyframes m-hazard { to { background-position: 22.63px 0; } }
+  .incident.is-crit::before { animation: m-pulse 1.6s ease-in-out infinite; animation-delay: calc(var(--phase, 0) * -1s); }
+
+  .tabbar button[aria-current="page"] { animation: m-press .32s cubic-bezier(.2, .9, .3, 1.4); }
+  @keyframes m-press { from { transform: scale(.92); } }
+
+  /* ------------------------------------------------------- entrance */
+
+  body.is-entering .view.is-active .deck-heading,
+  body.is-entering .view.is-active .status,
+  body.is-entering .view.is-active .ov-grid > *,
+  body.is-entering .view.is-active > :not(#summary) { animation: m-print .65s cubic-bezier(.2, .7, .2, 1) both; }
+  body.is-entering .view.is-active .status { animation-delay: .06s; }
+  body.is-entering .view.is-active .ov-grid > :nth-child(1) { animation-delay: .12s; }
+  body.is-entering .view.is-active .ov-grid > :nth-child(2) { animation-delay: .18s; }
+  body.is-entering .view.is-active .ov-grid > :nth-child(3) { animation-delay: .24s; }
+  body.is-entering .view.is-active .ov-grid > :nth-child(4) { animation-delay: .30s; }
+  body.is-entering .view.is-active .ov-grid > :nth-child(5) { animation-delay: .36s; }
+  body.is-entering .view.is-active .ov-grid > :nth-child(n+6) { animation-delay: .42s; }
+  body.is-entering .view.is-active > :nth-child(2) { animation-delay: .07s; }
+  body.is-entering .view.is-active > :nth-child(3) { animation-delay: .14s; }
+  body.is-entering .view.is-active > :nth-child(n+4) { animation-delay: .21s; }
+  @keyframes m-print { from { opacity: 0; transform: translateY(16px); clip-path: inset(0 0 100% 0); } to { opacity: 1; transform: none; clip-path: inset(0 0 -40px 0); } }
+
+  body.is-entering .node { animation: m-rise .55s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(.3s + var(--i, 0) * .07s); }
+  @keyframes m-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  body.is-entering .status__copy strong { animation: sp-type .7s steps(20) .3s both; }
+  body.is-entering .ring__arc { stroke-dasharray: 1; stroke-dashoffset: 1; animation: sp-draw .7s cubic-bezier(.3, .7, .2, 1) forwards; animation-delay: calc(.25s + var(--k, 0) * .045s); }
+  body.is-entering .ring__ticks { animation: sp-fade .6s .15s both; }
+
+  /* Traces are drawn left to right, then the read-head lands. */
+  body.is-entering .chart svg { animation: m-wipe 1s cubic-bezier(.4, 0, .2, 1) both; animation-delay: calc(.45s + var(--i, 0) * .07s); }
+  body.is-entering .chart__head { animation: m-land .3s ease-out both; animation-delay: calc(1.35s + var(--i, 0) * .07s); }
+  @keyframes m-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 -10px 0 0); } }
+  @keyframes m-land { from { opacity: 0; transform: scale(0); } 60% { opacity: 1; transform: scale(1.6); } to { opacity: 1; transform: none; } }
+
+  body.is-entering .blocks > i { animation: m-wipe .8s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(.5s + var(--i, 0) * .07s); }
+  body.is-entering .mx-row .hist { animation: m-wipe .9s steps(30) both; animation-delay: .55s; }
+  body.is-entering .hosting-map > svg { animation: m-wipe .9s cubic-bezier(.4, 0, .2, 1) .5s both; }
+  body.is-entering .map-item { animation: sp-fade .4s both; animation-delay: .45s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cycle { display: none; }
+}

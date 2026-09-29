@@ -1,0 +1,18 @@
+{
+  "appId": "io.annunciator.dashboard",
+  "appName": "Annunciator",
+  "webDir": "web",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "backgroundColor": "#dededc"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

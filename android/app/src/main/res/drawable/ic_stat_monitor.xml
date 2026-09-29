@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon: the app mark, white on transparent as Android requires. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M16,16 L16,4 M16,16 L28,12 M16,16 L23,28 M16,16 L9,28 M16,16 L4,12" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16,12.5 a3.5,3.5 0 1,1 0,7 a3.5,3.5 0 1,1 0,-7 M16,1.5 a2.5,2.5 0 1,1 0,5 a2.5,2.5 0 1,1 0,-5 M28,9.5 a2.5,2.5 0 1,1 0,5 a2.5,2.5 0 1,1 0,-5 M23,25.5 a2.5,2.5 0 1,1 0,5 a2.5,2.5 0 1,1 0,-5 M9,25.5 a2.5,2.5 0 1,1 0,5 a2.5,2.5 0 1,1 0,-5 M4,9.5 a2.5,2.5 0 1,1 0,5 a2.5,2.5 0 1,1 0,-5" />
+</vector>

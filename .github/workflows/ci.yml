@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # The server, tools and tests use only the standard library.
+      - name: Tests
+        run: python -m unittest discover -s tests -v
+      # AUDIT_MARKERS is an optional repository secret: owner-specific words
+      # (old host names, account names, addresses), one per line. Kept out of
+      # the tree so the list of what to hide is never published.
+      - name: Distribution audit
+        env:
+          AUDIT_MARKERS: ${{ secrets.AUDIT_MARKERS }}
+        run: |
+          if [ -n "$AUDIT_MARKERS" ]; then
+            mkdir -p runtime && printf '%s\n' "$AUDIT_MARKERS" > runtime/audit-markers.txt
+          fi
+          python tools/audit_public.py
+      - name: Localhost starter validates
+        run: python tools/setup.py --check server/config.example.json
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: JavaScript syntax
+        run: for f in web/*.js; do node --check "$f"; done
+      # Copies web/ into the Android project; no SDK is needed for this step.
+      - name: Capacitor sync
+        run: npx cap sync android

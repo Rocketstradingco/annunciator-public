@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#e1e2df">
+  <title>Annunciator</title>
+  <meta name="description" content="Annunciator command deck: your machines, services, and incidents.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="instruments.css">
+  <link rel="stylesheet" href="motion.css">
+  <script>
+    // Apply the saved theme before first paint so there is no flash.
+    try {
+      var t = localStorage.getItem('annunciator-public.theme.v2');
+      document.documentElement.dataset.theme = ['light', 'dark', 'system'].includes(t) ? t : 'light';
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="splash" id="splash" aria-hidden="true">
+    <div class="splash__grid"></div>
+    <div class="splash__top"><span>ANNUNCIATOR / SYSTEM MONITOR</span><span id="splash-clock">--:--:--</span></div>
+    <div class="splash__stage">
+      <div class="splash__dial">
+        <div class="splash__sweep"></div>
+        <svg class="splash__svg" viewBox="0 0 400 400" aria-hidden="true">
+          <circle class="sp-bezel" cx="200" cy="200" r="192"/>
+          <circle class="sp-ticks" cx="200" cy="200" r="178"/>
+          <circle class="sp-ticks sp-ticks--major" cx="200" cy="200" r="176"/>
+          <circle class="sp-bezel" cx="200" cy="200" r="160"/>
+          <circle class="sp-orbit" cx="200" cy="200" r="132"/>
+          <circle class="sp-inner sp-inner--dash" cx="200" cy="200" r="96"/>
+          <circle class="sp-inner" cx="200" cy="200" r="58"/>
+          <g id="splash-net"></g>
+          <circle class="sp-core-ping" cx="200" cy="200" r="22"/>
+          <circle class="sp-core" cx="200" cy="200" r="22"/>
+          <path class="sp-cross" d="M188 200h24M200 188v24"/>
+        </svg>
+      </div>
+      <div class="splash__copy">
+        <span class="splash__kicker">ANNUNCIATOR / OPERATIONS</span>
+        <h1 class="splash__title">System <br>monitor<span>.</span></h1>
+        <ol class="splash__log" id="splash-log"></ol>
+      </div>
+    </div>
+    <div class="splash__foot">
+      <div class="splash__scale"><i id="splash-bar"></i></div>
+      <div class="splash__meta"><span id="splash-stage">SEARCHING FOR AGGREGATOR</span><span id="splash-version"></span></div>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="brand">
+        <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 16 16 3 M16 16 29 12 M16 16 24 29 M16 16 8 29 M16 16 3 12"/>
+          <circle cx="16" cy="16" r="3"/><circle cx="16" cy="3" r="2"/><circle cx="29" cy="12" r="2"/><circle cx="24" cy="29" r="2"/><circle cx="8" cy="29" r="2"/><circle cx="3" cy="12" r="2"/>
+          <circle class="brand__ping" cx="16" cy="16" r="3"/>
+        </svg>
+        <span class="brand__name">Annunciator</span>
+        <span class="brand__sub">SYSTEM TELEMETRY</span>
+      </div>
+      <div class="clock" aria-hidden="true"><b id="clock">--:--:--</b><span id="clock-date"></span></div>
+      <div class="topbar__meta">
+        <span class="live" id="live"><i class="live__dot"></i><span id="updated">Connecting</span></span>
+        <button class="icon-btn" id="refresh" type="button" aria-label="Refresh now" title="Refresh now">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.76-4.24M16 3.5V6h-2.5"/></svg>
+        </button>
+        <button class="icon-btn" id="open-settings" type="button" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
+        </button>
+      </div>
+    </div>
+    <i class="cycle" id="cycle" aria-hidden="true"></i>
+  </header>
+
+  <div class="banner" id="banner" role="status" hidden>
+    <div class="banner__inner">
+      <span id="banner-text"></span>
+      <span class="banner__actions">
+          <button type="button" class="link-btn" data-action="retry">Retry</button>
+        <button type="button" class="link-btn" data-action="settings">Change server</button>
+      </span>
+    </div>
+  </div>
+
+  <main class="page" id="page">
+    <div class="empty" id="empty">
+      <p class="empty__title">Connecting to your server</p>
+      <p class="empty__body" id="empty-body">Waiting for the first reading.</p>
+      <div class="empty__actions" id="empty-actions" hidden>
+        <button type="button" class="btn" data-action="retry">Try again</button>
+        <button type="button" class="btn btn--quiet" data-action="settings">Server settings</button>
+      </div>
+    </div>
+
+    <section class="view" id="overview" data-view="overview" hidden>
+      <div id="summary"></div>
+    </section>
+
+    <section class="view" id="services" data-view="services" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Hosts</h2><i class="panel__rule" aria-hidden="true"></i>
+          <span class="panel__meta" id="hosts-meta"></span>
+        </div>
+        <div class="sys-list" id="host-list"></div>
+      </div>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Services</h2><i class="panel__rule" aria-hidden="true"></i>
+          <span class="panel__meta" id="services-meta"></span>
+        </div>
+        <div class="sys-list" id="service-list"></div>
+      </div>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Containers</h2><i class="panel__rule" aria-hidden="true"></i>
+          <span class="panel__meta" id="containers-meta"></span>
+        </div>
+        <div id="container-list"></div>
+      </div>
+    </section>
+
+    <section class="view detail" id="detail" data-view="detail" hidden>
+      <button type="button" class="back-btn" data-action="detail-back" id="detail-back">← Back</button>
+      <div id="detail-content"></div>
+    </section>
+
+    <section class="view" id="log" data-view="log" hidden>
+      <div class="panel"><div class="panel__head"><h2 class="panel__title">Events</h2><i class="panel__rule"></i><span class="panel__meta" id="events-meta"></span></div><ol class="log events" id="events"></ol></div>
+    </section>
+    <section class="view" id="setup" data-view="setup" hidden>
+      <div class="panel"><div class="panel__head"><h2 class="panel__title">Make it yours</h2></div>
+      <div class="pad"><p>This dashboard monitors your configured machines and services.</p>
+      <ol><li>Run <code>python3 tools/setup.py</code> in this app folder to choose your name, color, hosts, services, and optional controls.</li>
+      <li>Start or restart <code>python3 server/annunciator.py</code> after editing your configuration.</li>
+      <li>On another device, enter your own server URL in Settings. Android starts with no server configured.</li>
+      <li>Controls need your own control key in Settings and must be enabled on your server.</li></ol>
+      <p>Read the <a href="guide.html" target="_blank" rel="noopener">complete setup guide</a> for telemetry, permissions, branding, Android, alerts, updates and troubleshooting.</p>
+      <button class="btn btn--quiet" type="button" data-action="settings">Open Settings</button></div></div>
+    </section>
+  </main>
+  <nav class="tabbar" aria-label="Views">
+    <button type="button" data-tab="overview" aria-current="page"><span>Overview</span><i class="tabbar__badge" data-badge="overview" hidden></i></button>
+    <button type="button" data-tab="services"><span>Systems</span><i class="tabbar__badge" data-badge="services" hidden></i></button>
+    <button type="button" data-tab="log"><span>Log</span></button>
+    <button type="button" data-tab="setup"><span>Setup</span></button>
+  </nav>
+  <dialog class="sheet" id="settings" aria-labelledby="settings-title">
+    <form class="sheet__body" id="settings-form">
+      <h2 class="sheet__title" id="settings-title">Settings</h2>
+      <label class="field"><span class="field__label">Server address</span>
+        <input class="field__input" id="server-input" name="server" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://monitor.local:18160">
+        <span class="field__hint" id="server-hint">Blank uses this web page’s server. Android needs your server address.</span></label>
+      <label class="field"><span class="field__label">Fallback server address</span>
+        <input class="field__input" id="remote-input" name="remote" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Optional second address">
+        <span class="field__hint" id="remote-hint">Optional second route to your own server.</span></label>
+      <label class="field" id="control-key-field"><span class="field__label">Control key</span>
+        <input class="field__input" id="control-input" name="control-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Needed only for enabled controls">
+        <span class="field__hint">Stored only on this device. Generate your own key on your server.</span></label>
+      <fieldset class="field"><legend class="field__label">Theme</legend><div class="segmented" role="radiogroup">
+        <label><input type="radio" name="theme" value="system"><span>System</span></label>
+        <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+        <label><input type="radio" name="theme" value="dark"><span>Dark</span></label></div></fieldset>
+      <label class="field field--check" id="alerts-controls"><span class="field__label">Phone alerts</span>
+        <span class="check"><input type="checkbox" id="alerts-input"><span>Notify about host/service failures, recoveries and resource warnings. Android checks approximately every 15 minutes.</span></span></label>
+      <div class="field" id="update-controls"><span class="field__label">App update</span>
+        <span class="field__hint" id="update-status">Check for a newer build on your server.</span>
+        <div class="update-actions"><button type="button" class="btn btn--quiet btn--sm" id="update-check">Check for update</button><button type="button" class="btn btn--sm" id="update-install" hidden>Install update</button></div></div>
+      <div class="sheet__actions"><span class="sheet__version" id="app-version">Annunciator</span>
+        <button type="button" class="btn btn--quiet" id="settings-cancel">Cancel</button><button type="submit" class="btn">Save</button></div>
+    </form>
+  </dialog>
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+  <script src="config.js"></script><script src="app.js" type="module"></script>
+</body></html>
