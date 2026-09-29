@@ -2,7 +2,7 @@
 
 Drawn with Pillow rather than rasterising the SVGs because ImageMagick's
 built-in SVG renderer drops stroked shapes. Supersampled 4x for clean edges.
-Run from the project root: python3 assets/make_icons.py
+Run from the project root: python3 tools/make_icons.py (needs Pillow: pip install pillow)
 """
 
 from pathlib import Path
@@ -34,8 +34,12 @@ def grid(draw, size, span, stroke):
                 draw.rounded_rectangle(box, radius, fill=LIT)
             else:
                 inset = stroke / 2
-                draw.rounded_rectangle([box[0] + inset, box[1] + inset, box[2] - inset, box[3] - inset],
-                                       radius, outline=INK, width=round(stroke))
+                draw.rounded_rectangle(
+                    [box[0] + inset, box[1] + inset, box[2] - inset, box[3] - inset],
+                    radius,
+                    outline=INK,
+                    width=round(stroke),
+                )
 
 
 def render(size, span, background=True, corner=0.0, stroke_frac=0.03):
@@ -86,8 +90,10 @@ def main():
         big.resize((w, h), Image.LANCZOS).save(splash)
 
     values = RES / "values/ic_launcher_background.xml"
-    values.write_text('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
-                      '    <color name="ic_launcher_background">#071116</color>\n</resources>\n')
+    values.write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+        '    <color name="ic_launcher_background">#071116</color>\n</resources>\n'
+    )
     print("android icons written")
 
 

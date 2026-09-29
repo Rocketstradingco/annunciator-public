@@ -1,0 +1,50 @@
+// The smallest useful configuration: this computer and the dashboard itself.
+// The server runs with this file until you create config/local.json (the setup
+// wizard does that for you: python3 -m annunciator setup).
+//
+// Every other key has a default; config/full.example.jsonc lists them all and
+// docs/configuration.md explains each one. Comments are allowed.
+{
+  "$schema": "./schema.json",
+
+  // 127.0.0.1 keeps the dashboard on this computer. Use a LAN address or
+  // 0.0.0.0 to let phones and other computers connect.
+  "bind": "127.0.0.1",
+  "port": 18160,
+
+  "branding": {
+    "name": "Annunciator",
+    "subtitle": "SYSTEM TELEMETRY",
+    "accent": "#dc6b2f"
+  },
+
+  // Wake-on-LAN, power, container and speed-test controls stay off until you
+  // set this to true and create a control key (python3 -m annunciator control-key).
+  "allow_controls": false,
+
+  // Computers checked with a TCP connect. "telemetry": "local" adds CPU,
+  // memory and disk gauges for the computer running the dashboard.
+  "machines": [
+    {
+      "id": "monitor",
+      "name": "Monitor server",
+      "role": "This installation",
+      "os": "Linux",
+      "ip": "127.0.0.1",
+      "port": 18160,
+      "telemetry": "local"
+    }
+  ],
+
+  // HTTP endpoints checked with a GET; any answer below HTTP 500 counts as up.
+  "services": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard API",
+      "host": "monitor",
+      "description": "This Annunciator installation",
+      "probe": "http://127.0.0.1:18160/api/health",
+      "open": "http://127.0.0.1:18160/"
+    }
+  ]
+}

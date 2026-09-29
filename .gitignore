@@ -18,3 +18,7 @@ dist/
 .pytest_cache/
 .venv/
 venv/
+config/local.json
+*.egg-info/
+build/
+.ruff_cache/
