@@ -55,6 +55,16 @@ class IPv4HTTPSConnection(http.client.HTTPSConnection):
         self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
 
 
+def capped_blocks(limit: int, keep_going, size: int = 65536):
+    """Zero-filled chunks totalling at most ``limit`` bytes, while ``keep_going()`` is true."""
+    block = b"\0" * size
+    sent = 0
+    while sent < limit and keep_going():
+        chunk = block[: min(size, limit - sent)]
+        sent += len(chunk)
+        yield chunk
+
+
 def speed_test(iface: str | None, settings: dict) -> dict:
     """Latency, download and upload against the configured speed-test host.
 
@@ -106,10 +116,9 @@ def speed_test(iface: str | None, settings: dict) -> dict:
 
     def body():
         nonlocal sent
-        block = b"\0" * 65536
-        while sent < up_bytes and time.perf_counter() - up_start < up_s_cap:
-            sent += len(block)
-            yield block
+        for chunk in capped_blocks(up_bytes, lambda: time.perf_counter() - up_start < up_s_cap):
+            sent += len(chunk)
+            yield chunk
 
     conn = connect(timeout=8)
     up_start = time.perf_counter()

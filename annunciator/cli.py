@@ -64,6 +64,12 @@ def cmd_serve(args) -> int:
     _setup_logging((args.log_level or os.environ.get("ANNUNCIATOR_LOG_LEVEL") or "INFO").upper())
     loaded = _load(args)
     logging.getLogger().setLevel(loaded.config["log_level"])
+    from annunciator.server.remote import ssh_options
+
+    try:
+        ssh_options(loaded.config["ssh"])  # the file must exist, as serve needs it
+    except ValueError as exc:
+        raise ConfigError(str(exc), str(loaded.path)) from None
     if args.check:
         print(f"{loaded.path}: configuration is valid.")
         return 0

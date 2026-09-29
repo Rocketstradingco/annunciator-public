@@ -248,6 +248,11 @@ class CommandTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             result = self.run_cli("serve", "--check", "--config", str(bad), env={"ANNUNCIATOR_PORT": "0"})
             self.assertEqual(result.returncode, 2)
+            missing_ssh = Path(folder) / "ssh.json"
+            missing_ssh.write_text(json.dumps(example(ssh={"config": str(Path(folder) / "no-such-config")})))
+            result = self.run_cli("serve", "--check", "--config", str(missing_ssh))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("ssh.config: SSH config not found", result.stderr)
 
     def test_schema_and_show(self):
         result = self.run_cli("config", "schema")

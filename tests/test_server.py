@@ -317,6 +317,13 @@ class SpeedTestTests(unittest.TestCase):
             self.assertEqual(tests.snapshot()["routes"][0]["results"], [])
             self.assertIsNone(tests.snapshot()["next"])
 
+    def test_upload_never_exceeds_the_byte_limit(self):
+        from annunciator.server.speedtest import capped_blocks
+
+        self.assertEqual(sum(map(len, capped_blocks(20_000_000, lambda: True))), 20_000_000)
+        self.assertEqual([len(c) for c in capped_blocks(70_000, lambda: True)], [65536, 4464])
+        self.assertEqual(list(capped_blocks(10, lambda: False)), [])
+
     def test_results_are_capped_and_failures_logged(self):
         with tempfile.TemporaryDirectory() as folder:
             events = EventLog()
