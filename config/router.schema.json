@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Annunciator memory router configuration",
+  "type": "object",
+  "properties": {
+    "bind": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253}$",
+      "description": "Listen address. Keep it on loopback.",
+      "default": "127.0.0.1"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "Listen port.",
+      "default": 18170
+    },
+    "default_target": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Lease target when an agent names none.",
+      "default": "MEMORY.md"
+    },
+    "data_dir": {
+      "type": "string",
+      "description": "Decision log folder (no fact text is stored).",
+      "default": "data"
+    },
+    "key_file": {
+      "type": "string",
+      "description": "Router access key agents present.",
+      "default": "router.key"
+    },
+    "log_level": {
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR"
+      ],
+      "description": "Router log verbosity.",
+      "default": "INFO"
+    },
+    "questions": {
+      "type": "object",
+      "description": "Routing questions sent with each fact; generated from your machines."
+    },
+    "provider": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "jev",
+            "anthropic",
+            "openai"
+          ],
+          "description": "`jev` (OpenRouter typed decisions), `anthropic` (Claude via the Messages API) or `openai` (any OpenAI-compatible endpoint).",
+          "default": "jev"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200,
+          "description": "Model name. Default: `typesafe/jev-1.13` (jev), `claude-opus-5-5` (anthropic); required for `openai`."
+        },
+        "base_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^https?://",
+          "description": "API base URL. Defaults per type; set it for OpenRouter, Ollama, LM Studio or a proxy."
+        },
+        "api_key_env": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100,
+          "description": "Environment variable holding the API key. Default: `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`."
+        },
+        "api_key_file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "File holding the API key. Default: `openrouter.key`, `anthropic.key` or `openai.key` beside this config."
+        },
+        "timeout_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Seconds to wait for the provider.",
+          "default": 30
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 128000,
+          "description": "Output token cap for chat providers (includes any thinking).",
+          "default": 4096
+        },
+        "effort": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            null
+          ],
+          "description": "Anthropic `output_config.effort`. Unset uses the model default; `low` suits this task on models that support effort."
+        },
+        "json_mode": {
+          "type": "boolean",
+          "description": "OpenAI-compatible only: send `response_format: {\"type\": \"json_object\"}`. Enable for servers that support it.",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "$schema": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "questions"
+  ]
+}

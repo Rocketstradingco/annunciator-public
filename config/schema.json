@@ -1,0 +1,612 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Annunciator dashboard configuration",
+  "type": "object",
+  "properties": {
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "TCP port the dashboard listens on.",
+      "default": 18160
+    },
+    "bind": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253}$",
+      "description": "Listen address. `127.0.0.1` is this computer only; use a LAN address or `0.0.0.0` to let phones and other computers connect.",
+      "default": "127.0.0.1"
+    },
+    "log_level": {
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR"
+      ],
+      "description": "Server log verbosity.",
+      "default": "INFO"
+    },
+    "data_dir": {
+      "type": "string",
+      "description": "Private state: control key, speed-test history, memory-router files. Keep it out of Git.",
+      "default": "runtime"
+    },
+    "web_root": {
+      "type": "string",
+      "description": "Folder the web client is served from.",
+      "default": "web"
+    },
+    "updates_dir": {
+      "type": "string",
+      "description": "Folder holding a staged Android update (`release.json` + `annunciator.apk`).",
+      "default": "updates"
+    },
+    "control_key_file": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "File holding the control key. Default: `<data_dir>/control.key`. `ANNUNCIATOR_CONTROL_KEY` supplies the key itself and wins over the file."
+    },
+    "cors_origin": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "`Access-Control-Allow-Origin` sent with every response. `*` lets the Android app and other origins read the API; set your own origin or `\"\"` to omit the header.",
+      "default": "*"
+    },
+    "interval_s": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3600,
+      "description": "Seconds between TCP/HTTP availability probes.",
+      "default": 10
+    },
+    "history": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 8640,
+      "description": "Availability samples kept per host and service (memory only; reset on restart).",
+      "default": 90
+    },
+    "allow_controls": {
+      "type": "boolean",
+      "description": "Enable the key-protected write endpoints: Wake-on-LAN, power, containers, speed tests.",
+      "default": false
+    },
+    "branding": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Dashboard name.",
+          "default": "Annunciator"
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Header subtitle.",
+          "default": "SYSTEM TELEMETRY"
+        },
+        "accent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "Accent colour as `#RRGGBB`. Unset keeps the built-in orange."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "poll_s": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300,
+          "description": "Seconds between the client's `/api/state` refreshes.",
+          "default": 5
+        }
+      },
+      "additionalProperties": false
+    },
+    "probe": {
+      "type": "object",
+      "properties": {
+        "timeout_s": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 60,
+          "description": "Seconds before a TCP or HTTP probe counts as failed.",
+          "default": 3
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "description": "Probes run in parallel per cycle.",
+          "default": 16
+        }
+      },
+      "additionalProperties": false
+    },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "interval_s": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "Seconds between collections.",
+          "default": 15
+        },
+        "history": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 8640,
+          "description": "CPU and network samples kept per machine for charts.",
+          "default": 60
+        },
+        "timeout_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Seconds a Linux collection (local or SSH) may take.",
+          "default": 15
+        },
+        "windows_timeout_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Seconds a Windows PowerShell collection may take.",
+          "default": 30
+        }
+      },
+      "additionalProperties": false
+    },
+    "container_poll": {
+      "type": "object",
+      "properties": {
+        "interval_s": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 3600,
+          "description": "Seconds between inventory polls.",
+          "default": 30
+        },
+        "timeout_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Seconds an inventory command may take.",
+          "default": 20
+        },
+        "action_timeout_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Seconds a start/stop/restart may take.",
+          "default": 60
+        }
+      },
+      "additionalProperties": false
+    },
+    "thresholds": {
+      "type": "object",
+      "properties": {
+        "disk_warn": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Disk use that raises a warning.",
+          "default": 0.8
+        },
+        "disk_crit": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Disk use that raises a critical alert.",
+          "default": 0.9
+        },
+        "mem_warn": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Memory use that raises a warning.",
+          "default": 0.9
+        }
+      },
+      "additionalProperties": false
+    },
+    "wake": {
+      "type": "object",
+      "properties": {
+        "broadcast": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253}$",
+          "description": "Destination address for magic packets; use your subnet's broadcast if needed.",
+          "default": "255.255.255.255"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253}$",
+          "description": "Local address to send from, to pick the outgoing interface."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "UDP port for magic packets.",
+          "default": 9
+        },
+        "window_s": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 3600,
+          "description": "Seconds a machine shows as waking after a packet.",
+          "default": 180
+        },
+        "cooldown_s": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600,
+          "description": "Seconds before another packet may be sent to the same machine.",
+          "default": 10
+        }
+      },
+      "additionalProperties": false
+    },
+    "ssh": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Dedicated `ssh_config` file (the wizard writes `<data_dir>/ssh/config`)."
+        },
+        "connect_timeout_s": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "description": "SSH `ConnectTimeout`.",
+          "default": 4
+        },
+        "control_persist_s": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "Seconds an idle multiplexed connection stays open (`ControlPersist`). 0 disables multiplexing.",
+          "default": 180
+        },
+        "control_path": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "`ControlPath` for multiplexed connections.",
+          "default": "/tmp/annunciator-public-ssh-%C"
+        },
+        "command_timeout_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Seconds a power command may take.",
+          "default": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "object",
+      "properties": {
+        "keep": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 100000,
+          "description": "Events kept in memory.",
+          "default": 200
+        },
+        "recent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Events included in each `/api/state` reply.",
+          "default": 40
+        }
+      },
+      "additionalProperties": false
+    },
+    "speedtest": {
+      "type": "object",
+      "properties": {
+        "interval_h": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 8760,
+          "description": "Hours between scheduled runs.",
+          "default": 3
+        },
+        "first_delay_s": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "Minimum seconds after start-up before the first scheduled run.",
+          "default": 120
+        },
+        "host": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253}$",
+          "description": "Host serving `/__down` and `/__up`.",
+          "default": "speed.cloudflare.com"
+        },
+        "download_limit_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 120,
+          "description": "Download phase time cap.",
+          "default": 8
+        },
+        "download_limit_bytes": {
+          "type": "integer",
+          "minimum": 100000,
+          "maximum": 10000000000,
+          "description": "Download phase byte cap.",
+          "default": 50000000
+        },
+        "upload_limit_s": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 120,
+          "description": "Upload phase time cap.",
+          "default": 6
+        },
+        "upload_limit_bytes": {
+          "type": "integer",
+          "minimum": 100000,
+          "maximum": 10000000000,
+          "description": "Upload phase byte cap.",
+          "default": 20000000
+        },
+        "keep": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Results kept per route.",
+          "default": 48
+        },
+        "history_file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where results persist. Default: `<data_dir>/speedtest.json`."
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                "description": "Unique route ID."
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 80,
+                "description": "Display name. Default: the ID."
+              },
+              "iface": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[A-Za-z0-9_.:-]{1,40}$",
+                "description": "Linux interface to bind (for example `eth0`); may need extra privileges."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "memory_router": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^https?://",
+          "description": "Router URL; must be on this computer (`127.0.0.1` or `localhost`)."
+        },
+        "key_file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Router access key. Default: `<data_dir>/memory/router.key`."
+        },
+        "timeout_s": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30,
+          "description": "Seconds to wait for the router when building `/api/state`.",
+          "default": 1.5
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ]
+    },
+    "$schema": {
+      "type": "string"
+    },
+    "machines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "description": "Unique machine ID (letters, digits, `_`, `-`)."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80,
+            "description": "Display name. Default: the ID."
+          },
+          "ip": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253}$",
+            "description": "Hostname or IP address the server connects to."
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "description": "TCP port to probe.",
+            "default": 22
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Free-text role shown in details.",
+            "default": ""
+          },
+          "os": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Operating-system label shown in details.",
+            "default": ""
+          },
+          "platform": {
+            "enum": [
+              "linux",
+              "windows"
+            ],
+            "description": "Decides the power command.",
+            "default": "linux"
+          },
+          "ssh": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253}$",
+            "description": "SSH target (`user@host` or an alias) for containers and power. Unset means local."
+          },
+          "telemetry": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(local|(ssh|winps):[A-Za-z0-9_][A-Za-z0-9_.:@\\[\\]-]{0,253})$",
+            "description": "`local`, `ssh:TARGET` (Linux) or `winps:TARGET` (Windows). Unset: availability only."
+          },
+          "containers": {
+            "enum": [
+              "docker",
+              "podman",
+              null
+            ],
+            "description": "Container runtime to inventory."
+          },
+          "mac": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$",
+            "description": "MAC address for Wake-on-LAN."
+          },
+          "setup_user": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "Written by the wizard: the account its target script is for. Not used at runtime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ip"
+        ]
+      }
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "description": "Unique service ID."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80,
+            "description": "Display name. Default: the ID."
+          },
+          "probe": {
+            "type": "string",
+            "pattern": "^https?://",
+            "description": "URL the server requests. Any answer below HTTP 500 counts as up."
+          },
+          "open": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^https?://",
+            "description": "URL a browser or phone opens."
+          },
+          "host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "ID of the machine this service runs on."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Free-text description.",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "probe"
+        ]
+      }
+    }
+  },
+  "additionalProperties": false
+}
